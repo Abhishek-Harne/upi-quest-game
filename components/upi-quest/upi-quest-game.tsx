@@ -236,7 +236,7 @@ function GameInner() {
 
       const beats: Array<{ phase: AttackPhase; ms: number; onStart?: () => void }> = [
         { phase: 'warning', ms: 2200, onStart: () => play('alarm') },
-        { phase: 'thief', ms: 4000, onStart: () => play('error') },
+        { phase: 'thief', ms: 6500, onStart: () => play('error') },
         { phase: 'narration', ms: 7000 },
         { phase: 'siren', ms: 2200, onStart: () => play('siren') },
         { phase: 'guardian', ms: 4400, onStart: () => play('success') },

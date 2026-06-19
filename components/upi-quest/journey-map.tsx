@@ -309,12 +309,7 @@ export function JourneyMap({
                 const wave =
                   idx % 2 === 0 ? 'sm:-translate-y-3.5' : 'sm:translate-y-3.5'
                 return (
-                  <motion.div
-                    key={s.id}
-                    layout
-                    ref={setRef(globalIdx)}
-                    className={cn(wave)}
-                  >
+                  <motion.div key={s.id} ref={setRef(globalIdx)} className={cn(wave)}>
                     <StationNode
                       station={s}
                       state={stateFor(globalIdx)}
