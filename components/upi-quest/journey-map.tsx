@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import {
   AGGREGATORS,
   BANKS,
@@ -9,11 +9,15 @@ import {
   UPI_APPS,
   providerById,
   type Participants,
+  type ParticipantSlot,
+  type Provider,
   type Station,
 } from '@/lib/upi-data'
 import { ACCENT_VAR, StationNode, type NodeState } from './station-node'
 import { EnergyPacket } from './energy-packet'
 import { cn } from '@/lib/utils'
+
+export type AttackPhase = 'none' | 'incoming' | 'blocked'
 
 interface JourneyMapProps {
   activeIndex: number
@@ -21,13 +25,30 @@ interface JourneyMapProps {
   failedIndex: number | null
   running: boolean
   xray: boolean
+  canCustomize: boolean
   participants: Participants
+  attackPhase: AttackPhase
   onStationClick: (s: Station) => void
+  onSelectProvider: (slot: ParticipantSlot, id: string) => void
 }
 
 interface Point {
   x: number
   y: number
+}
+
+function optionsForSlot(slot: ParticipantSlot): Provider[] | undefined {
+  switch (slot) {
+    case 'app':
+      return UPI_APPS
+    case 'aggregator':
+      return AGGREGATORS
+    case 'senderBank':
+    case 'receiverBank':
+      return BANKS
+    default:
+      return undefined
+  }
 }
 
 function providerFor(station: Station, p: Participants) {
@@ -45,14 +66,20 @@ function providerFor(station: Station, p: Participants) {
   }
 }
 
+// Index of the Internet node, where intrusion attempts surface.
+const INTERNET_INDEX = STATIONS.findIndex((s) => s.id === 'internet')
+
 export function JourneyMap({
   activeIndex,
   maxReached,
   failedIndex,
   running,
   xray,
+  canCustomize,
   participants,
+  attackPhase,
   onStationClick,
+  onSelectProvider,
 }: JourneyMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const nodeRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -96,8 +123,31 @@ export function JourneyMap({
     return 'idle'
   }
 
+  function renderNode(s: Station, i: number) {
+    return (
+      <div
+        key={s.id}
+        ref={(el) => {
+          nodeRefs.current[i] = el
+        }}
+      >
+        <StationNode
+          station={s}
+          state={stateFor(i)}
+          provider={providerFor(s, participants)}
+          providerOptions={optionsForSlot(s.slot)}
+          onSelectProvider={(id) => onSelectProvider(s.slot, id)}
+          canCustomize={canCustomize}
+          xray={xray}
+          onClick={() => onStationClick(s)}
+        />
+      </div>
+    )
+  }
+
   const packetPos =
     activeIndex >= 0 && centers[activeIndex] ? centers[activeIndex] : centers[0]
+  const attackPos = centers[INTERNET_INDEX]
 
   return (
     <div
@@ -125,7 +175,6 @@ export function JourneyMap({
                 : 'var(--grid)'
             return (
               <g key={i}>
-                {/* base pipe */}
                 <line
                   x1={c.x}
                   y1={c.y}
@@ -134,7 +183,6 @@ export function JourneyMap({
                   stroke="var(--border)"
                   strokeWidth={6}
                 />
-                {/* energized current */}
                 <line
                   x1={c.x}
                   y1={c.y}
@@ -151,7 +199,6 @@ export function JourneyMap({
                     opacity: reached ? 1 : 0.5,
                   }}
                 />
-                {/* router midpoint */}
                 <rect
                   x={(c.x + next.x) / 2 - 3}
                   y={(c.y + next.y) / 2 - 3}
@@ -173,64 +220,21 @@ export function JourneyMap({
       </div>
 
       {/* Nodes: serpentine on desktop, vertical on mobile */}
-      <div className="relative z-10 flex flex-col items-stretch gap-6 sm:gap-8">
+      <div className="relative z-10 flex flex-col items-stretch gap-8 sm:gap-10">
         {/* Row 1: sender -> upi-app -> aggregator -> sender-bank */}
-        <div className="flex flex-col items-center justify-between gap-6 sm:flex-row sm:items-start">
-          {STATIONS.slice(0, 4).map((s, i) => (
-            <div
-              key={s.id}
-              ref={(el) => {
-                nodeRefs.current[i] = el
-              }}
-            >
-              <StationNode
-                station={s}
-                state={stateFor(i)}
-                provider={providerFor(s, participants)}
-                xray={xray}
-                onClick={() => onStationClick(s)}
-              />
-            </div>
-          ))}
+        <div className="flex flex-col items-center justify-between gap-8 sm:flex-row sm:items-start">
+          {STATIONS.slice(0, 4).map((s, i) => renderNode(s, i))}
         </div>
 
-        {/* Row 2 (desktop reversed for serpentine): npci centered */}
-        <div className="flex justify-center">
-          <div
-            ref={(el) => {
-              nodeRefs.current[4] = el
-            }}
-          >
-            <StationNode
-              station={STATIONS[4]}
-              state={stateFor(4)}
-              xray={xray}
-              onClick={() => onStationClick(STATIONS[4])}
-            />
-          </div>
+        {/* Row 2: internet -> npci (reversed on desktop for serpentine flow) */}
+        <div className="flex flex-col items-center justify-center gap-8 sm:flex-row-reverse sm:justify-between sm:px-12">
+          {renderNode(STATIONS[4], 4)}
+          {renderNode(STATIONS[5], 5)}
         </div>
 
         {/* Row 3: receiver-bank -> receiver-phone */}
-        <div className="flex flex-col items-center justify-center gap-6 sm:flex-row sm:gap-16">
-          {STATIONS.slice(5).map((s, idx) => {
-            const i = idx + 5
-            return (
-              <div
-                key={s.id}
-                ref={(el) => {
-                  nodeRefs.current[i] = el
-                }}
-              >
-                <StationNode
-                  station={s}
-                  state={stateFor(i)}
-                  provider={providerFor(s, participants)}
-                  xray={xray}
-                  onClick={() => onStationClick(s)}
-                />
-              </div>
-            )
-          })}
+        <div className="flex flex-col items-center justify-center gap-8 sm:flex-row sm:gap-16">
+          {STATIONS.slice(6).map((s, idx) => renderNode(s, idx + 6))}
         </div>
       </div>
 
@@ -244,6 +248,40 @@ export function JourneyMap({
           <EnergyPacket pixel={4} />
         </motion.div>
       )}
+
+      {/* Inline intrusion / Guardian event near the Internet node */}
+      <AnimatePresence>
+        {attackPhase !== 'none' && attackPos && (
+          <motion.div
+            key="attack"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.6 }}
+            className="pointer-events-none absolute z-30 flex -translate-x-1/2 flex-col items-center"
+            style={{ left: attackPos.x, top: attackPos.y - 70 }}
+          >
+            {attackPhase === 'incoming' ? (
+              <>
+                <div className="animate-[hacker-shake_0.5s_steps(2)_infinite] font-mono text-xl leading-none text-destructive crt-glow">
+                  {'[X_X]'}
+                </div>
+                <span className="mt-1 border-2 border-destructive bg-destructive/20 px-1 font-pixel text-[7px] uppercase text-destructive">
+                  Intrusion!
+                </span>
+              </>
+            ) : (
+              <>
+                <div className="animate-packet-glow font-mono text-xl leading-none text-arcade-cyan crt-glow">
+                  {'[#]'}
+                </div>
+                <span className="mt-1 border-2 border-arcade-cyan bg-arcade-cyan/15 px-1 font-pixel text-[7px] uppercase text-arcade-cyan">
+                  Blocked
+                </span>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* X-ray detail strip */}
       {xray && activeIndex >= 0 && STATIONS[activeIndex] && (

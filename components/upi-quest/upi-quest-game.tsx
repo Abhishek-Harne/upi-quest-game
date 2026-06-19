@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import confetti from 'canvas-confetti'
-import { BookOpen, Eye, EyeOff, PlayCircle, Shield } from 'lucide-react'
+import { Eye, EyeOff, PlayCircle, ShieldAlert, Sparkles } from 'lucide-react'
 import {
   MODES,
   STATIONS,
@@ -11,28 +11,28 @@ import {
   getLevel,
   formatINR,
   type ModeId,
+  type ParticipantSlot,
   type Station,
 } from '@/lib/upi-data'
-import { FUN_FACTS } from '@/lib/upi-facts'
+import { FUN_FACTS, type FunFact } from '@/lib/upi-facts'
+import { SECURITY_SCENARIOS } from '@/lib/security-data'
 import { GameStoreProvider, useGameStore } from '@/lib/game-store'
 import { useArcadeSound } from '@/lib/use-arcade-sound'
 import { ArcadeBackground } from './arcade-background'
 import { Hud } from './hud'
 import { SenderPhone } from './sender-phone'
 import { ReceiverPhone } from './receiver-phone'
-import { JourneyMap } from './journey-map'
+import { JourneyMap, type AttackPhase } from './journey-map'
 import { ModeSelector } from './mode-selector'
-import { ParticipantCustomizer } from './participant-customizer'
 import { DialogueBox } from './dialogue-box'
 import { ResultModal, type ResultData } from './result-modal'
-import { SecurityChallenge } from './security-challenge'
-import { FactsCollection } from './facts-collection'
 import { WelcomeModal } from './welcome-modal'
 import { BurgerMenu } from './burger-menu'
 import { PixelButton } from './pixel-button'
 import { ToastProvider, useToast } from './toast-provider'
 
 const STEP_BASE_MS = 850
+const INTERNET_INDEX = STATIONS.findIndex((s) => s.id === 'internet')
 
 export function UpiQuestGame() {
   return (
@@ -44,8 +44,6 @@ export function UpiQuestGame() {
   )
 }
 
-type Tab = 'play' | 'facts' | 'security'
-
 function GameInner() {
   const store = useGameStore()
   const { toast } = useToast()
@@ -53,7 +51,6 @@ function GameInner() {
 
   const [amount, setAmount] = useState(500)
   const [mode, setMode] = useState<ModeId>('normal')
-  const [tab, setTab] = useState<Tab>('play')
 
   const [activeIndex, setActiveIndex] = useState(-1)
   const [maxReached, setMaxReached] = useState(-1)
@@ -61,18 +58,22 @@ function GameInner() {
   const [running, setRunning] = useState(false)
   const [received, setReceived] = useState(false)
 
+  const [attackArmed, setAttackArmed] = useState(false)
+  const [attackPhase, setAttackPhase] = useState<AttackPhase>('none')
+
   const [dialogueStation, setDialogueStation] = useState<Station | null>(null)
   const [result, setResult] = useState<ResultData | null>(null)
+  const [lastFact, setLastFact] = useState<FunFact | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [welcomeOpen, setWelcomeOpen] = useState(false)
 
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
   const startedAt = useRef(0)
   const readNodes = useRef<Set<string>>(new Set())
+  const scenarioIdx = useRef(0)
 
   const overLimit = amount > UPI_MAX_AMOUNT
 
-  // Show welcome on first visit (after hydration)
   useEffect(() => {
     if (store.hydrated && !store.settings.welcomeDismissed) {
       setWelcomeOpen(true)
@@ -128,17 +129,19 @@ function GameInner() {
         if (factId) {
           xpEarned += XP.unlockFact
           const f = FUN_FACTS.find((x) => x.id === factId)
-          if (f)
+          if (f) {
+            setLastFact(f)
             toast({
               tone: 'fact',
               title: `Fact Unlocked: ${f.title}`,
               detail: f.fact,
             })
+          }
         }
         toast({
           tone: 'success',
           title: 'Transaction Complete',
-          detail: `${formatINR(amount)} delivered across all 7 stations`,
+          detail: `${formatINR(amount)} delivered across all ${STATIONS.length} stations`,
         })
       } else {
         play('error')
@@ -149,7 +152,6 @@ function GameInner() {
         })
       }
 
-      // scenario XP (once per failure scenario)
       if (selectedMode.failAt && store.markScenarioTried(mode)) {
         xpEarned += selectedMode.xp
         toast({
@@ -180,6 +182,51 @@ function GameInner() {
     [amount, celebrate, mode, play, store, toast],
   )
 
+  const triggerAttack = useCallback(
+    (baseDelay: number) => {
+      const scenario =
+        SECURITY_SCENARIOS[scenarioIdx.current % SECURITY_SCENARIOS.length]
+      scenarioIdx.current += 1
+
+      timers.current.push(
+        setTimeout(() => {
+          setAttackPhase('incoming')
+          play('error')
+          toast({
+            tone: 'error',
+            title: `Intrusion: ${scenario.attack}`,
+            detail: scenario.attackDesc,
+          })
+        }, baseDelay),
+      )
+      timers.current.push(
+        setTimeout(() => {
+          setAttackPhase('blocked')
+          play('success')
+          store.recordCyberWin()
+          const newXp = store.addXp(XP.cyberChallenge)
+          void newXp
+          toast({
+            tone: 'cyber',
+            title: `Guardian Blocked It! +${XP.cyberChallenge} XP`,
+            detail: scenario.defenseDesc,
+          })
+        }, baseDelay + 700),
+      )
+      timers.current.push(
+        setTimeout(() => {
+          setAttackPhase('none')
+          toast({
+            tone: 'fact',
+            title: `Lesson: ${scenario.defense}`,
+            detail: scenario.lesson,
+          })
+        }, baseDelay + 1700),
+      )
+    },
+    [play, store, toast],
+  )
+
   const runJourney = useCallback(() => {
     if (running || overLimit) return
     clearTimers()
@@ -191,6 +238,7 @@ function GameInner() {
     setResult(null)
     setReceived(false)
     setFailedIndex(null)
+    setAttackPhase('none')
     setActiveIndex(0)
     setMaxReached(0)
     setRunning(true)
@@ -221,6 +269,12 @@ function GameInner() {
       timers.current.push(t)
     }
 
+    // Inline cyber-attack event at the Internet node on healthy journeys
+    const reachesInternet = failIdx < 0 || failIdx > INTERNET_INDEX
+    if (attackArmed && reachesInternet) {
+      triggerAttack(stepMs * INTERNET_INDEX + stepMs * 0.4)
+    }
+
     const endT = setTimeout(
       () => {
         if (failIdx >= 0) {
@@ -233,7 +287,17 @@ function GameInner() {
       stepMs * (lastStep + 1),
     )
     timers.current.push(endT)
-  }, [clearTimers, finish, mode, overLimit, play, running, toast])
+  }, [
+    attackArmed,
+    clearTimers,
+    finish,
+    mode,
+    overLimit,
+    play,
+    running,
+    toast,
+    triggerAttack,
+  ])
 
   const reset = useCallback(() => {
     clearTimers()
@@ -243,6 +307,7 @@ function GameInner() {
     setFailedIndex(null)
     setReceived(false)
     setResult(null)
+    setAttackPhase('none')
   }, [clearTimers])
 
   const onStationClick = useCallback(
@@ -262,23 +327,16 @@ function GameInner() {
     [play, store, toast],
   )
 
-  const onCyberWin = useCallback(
-    (scenarioId: string) => {
-      store.recordCyberWin()
-      store.addXp(XP.cyberChallenge)
-      play('success')
-      toast({
-        tone: 'cyber',
-        title: `Threat Blocked! +${XP.cyberChallenge} XP`,
-        detail: 'The Cyber Guardian kept the payment safe.',
-      })
-      void scenarioId
+  const onSelectProvider = useCallback(
+    (slot: ParticipantSlot, id: string) => {
+      if (!slot) return
+      store.setParticipants({ [slot]: id })
+      play('blip')
     },
-    [play, store, toast],
+    [play, store],
   )
 
   const startDemo = useCallback(() => {
-    setTab('play')
     setMode('normal')
     setTimeout(() => runJourney(), 400)
   }, [runJourney])
@@ -300,119 +358,99 @@ function GameInner() {
 
         <Hud onOpenMenu={() => setMenuOpen(true)} />
 
-        {/* Tabs */}
-        <nav className="flex flex-wrap items-center gap-2" aria-label="Game sections">
-          <TabButton
-            active={tab === 'play'}
-            onClick={() => setTab('play')}
-            icon={<PlayCircle className="h-3.5 w-3.5" />}
-          >
-            Play
-          </TabButton>
-          <TabButton
-            active={tab === 'facts'}
-            onClick={() => setTab('facts')}
-            icon={<BookOpen className="h-3.5 w-3.5" />}
-          >
-            Facts
-          </TabButton>
-          <TabButton
-            active={tab === 'security'}
-            onClick={() => setTab('security')}
-            icon={<Shield className="h-3.5 w-3.5" />}
-          >
-            Cyber
-          </TabButton>
+        {/* Phones */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SenderPhone
+            amount={amount}
+            setAmount={setAmount}
+            onSend={runJourney}
+            running={running}
+            overLimit={overLimit}
+          />
+          <ReceiverPhone received={received} amount={amount} />
+        </div>
 
-          {tab === 'play' && (
-            <button
-              onClick={() => store.setSettings({ xray: !store.settings.xray })}
-              className="ml-auto flex items-center gap-1.5 border-2 border-arcade-cyan bg-background px-2.5 py-1.5 font-mono text-xs uppercase text-arcade-cyan transition-colors hover:bg-arcade-cyan/10"
-              aria-pressed={store.settings.xray}
-            >
-              {store.settings.xray ? (
+        {/* Scenario selector */}
+        <ModeSelector selected={mode} onSelect={setMode} disabled={running} />
+
+        {/* Toggles: X-Ray + Simulate Attack */}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <ToggleChip
+            active={store.settings.xray}
+            onClick={() => store.setSettings({ xray: !store.settings.xray })}
+            activeClass="border-arcade-cyan bg-arcade-cyan/10 text-arcade-cyan"
+            icon={
+              store.settings.xray ? (
                 <EyeOff className="h-3.5 w-3.5" />
               ) : (
                 <Eye className="h-3.5 w-3.5" />
-              )}
-              X-Ray
-            </button>
-          )}
-        </nav>
+              )
+            }
+          >
+            X-Ray Mode
+          </ToggleChip>
+          <ToggleChip
+            active={attackArmed}
+            onClick={() => setAttackArmed((a) => !a)}
+            activeClass="border-destructive bg-destructive/10 text-destructive"
+            icon={<ShieldAlert className="h-3.5 w-3.5" />}
+          >
+            {attackArmed ? 'Attack Armed' : 'Simulate Attack'}
+          </ToggleChip>
+        </div>
 
-        {tab === 'play' && (
-          <div className="flex flex-col gap-4">
-            {/* Phones row */}
-            <div className="grid gap-4 lg:grid-cols-2">
-              <SenderPhone
-                amount={amount}
-                setAmount={setAmount}
-                onSend={runJourney}
-                running={running}
-                overLimit={overLimit}
-              />
-              <ReceiverPhone received={received} amount={amount} />
+        {/* Journey map (always the centerpiece) */}
+        <JourneyMap
+          activeIndex={activeIndex}
+          maxReached={maxReached}
+          failedIndex={failedIndex}
+          running={running}
+          xray={store.settings.xray}
+          canCustomize={!running}
+          participants={store.participants}
+          attackPhase={attackPhase}
+          onStationClick={onStationClick}
+          onSelectProvider={onSelectProvider}
+        />
+
+        {/* Actions */}
+        <div className="flex flex-wrap justify-center gap-2">
+          <PixelButton variant="ghost" onClick={reset} disabled={running}>
+            Reset
+          </PixelButton>
+          <PixelButton
+            variant="primary"
+            onClick={runJourney}
+            disabled={running || overLimit}
+          >
+            <PlayCircle className="h-4 w-4" />
+            {running ? 'Routing...' : 'Send Payment'}
+          </PixelButton>
+        </div>
+
+        {/* Inline discovery reveal */}
+        {lastFact && (
+          <div className="flex items-start gap-2 border-2 border-coin/60 bg-coin/10 p-3">
+            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-coin" />
+            <div>
+              <p className="font-pixel text-[8px] uppercase text-coin">
+                Latest Discovery &mdash; {lastFact.title}
+              </p>
+              <p className="mt-1 font-mono text-xs leading-relaxed text-card-foreground">
+                {lastFact.fact}
+              </p>
+              <p className="mt-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                {lastFact.why}
+              </p>
             </div>
-
-            {/* Controls */}
-            <div className="grid gap-4 lg:grid-cols-2">
-              <ModeSelector
-                selected={mode}
-                onSelect={setMode}
-                disabled={running}
-              />
-              {store.settings.creatorMode ? (
-                <ParticipantCustomizer
-                  participants={store.participants}
-                  onChange={store.setParticipants}
-                  disabled={running}
-                />
-              ) : (
-                <CreatorPrompt
-                  onEnable={() => store.setSettings({ creatorMode: true })}
-                />
-              )}
-            </div>
-
-            {/* Journey map */}
-            <JourneyMap
-              activeIndex={activeIndex}
-              maxReached={maxReached}
-              failedIndex={failedIndex}
-              running={running}
-              xray={store.settings.xray}
-              participants={store.participants}
-              onStationClick={onStationClick}
-            />
-
-            <div className="flex flex-wrap justify-center gap-2">
-              <PixelButton variant="ghost" onClick={reset} disabled={running}>
-                Reset
-              </PixelButton>
-              <PixelButton
-                variant="primary"
-                onClick={runJourney}
-                disabled={running || overLimit}
-              >
-                <PlayCircle className="h-4 w-4" />
-                {running ? 'Routing...' : 'Send Payment'}
-              </PixelButton>
-            </div>
-
-            <p className="text-center font-mono text-xs leading-relaxed text-muted-foreground">
-              Tap any station to hear what it does and earn XP. Try the failure
-              scenarios to see how UPI protects your money.
-            </p>
           </div>
         )}
 
-        {tab === 'facts' && (
-          <div className="border-4 border-border bg-card p-4 shadow-[5px_5px_0_0_rgba(0,0,0,0.5)]">
-            <FactsCollection />
-          </div>
-        )}
-
-        {tab === 'security' && <SecurityChallenge onWin={onCyberWin} />}
+        <p className="text-center font-mono text-xs leading-relaxed text-muted-foreground">
+          Tap any station to learn what it does and earn XP. Tap a provider chip
+          to swap your UPI app, aggregator or banks. Arm an attack to watch the
+          Cyber Guardian defend your money in transit.
+        </p>
       </main>
 
       {/* Overlays */}
@@ -434,46 +472,31 @@ function GameInner() {
   )
 }
 
-function TabButton({
+function ToggleChip({
   active,
   onClick,
   icon,
+  activeClass,
   children,
 }: {
   active: boolean
   onClick: () => void
   icon: React.ReactNode
+  activeClass: string
   children: React.ReactNode
 }) {
   return (
     <button
       onClick={onClick}
       aria-pressed={active}
-      className={`flex items-center gap-1.5 border-2 px-3 py-1.5 font-pixel text-[9px] uppercase transition-all ${
+      className={`flex items-center gap-1.5 border-2 px-3 py-1.5 font-mono text-xs uppercase transition-colors ${
         active
-          ? 'border-coin bg-coin/15 text-coin shadow-[3px_3px_0_0_rgba(0,0,0,0.5)]'
+          ? activeClass
           : 'border-border bg-background text-muted-foreground hover:text-foreground'
       }`}
     >
       {icon}
       {children}
     </button>
-  )
-}
-
-function CreatorPrompt({ onEnable }: { onEnable: () => void }) {
-  return (
-    <div className="flex flex-col items-start justify-center gap-2 border-4 border-dashed border-border bg-card/60 p-3">
-      <p className="font-pixel text-[9px] uppercase text-arcade-magenta">
-        Creator Mode
-      </p>
-      <p className="font-mono text-xs leading-relaxed text-muted-foreground">
-        Swap the UPI app, aggregator and banks to see how your real payment
-        setup is routed across the network.
-      </p>
-      <PixelButton variant="cyan" onClick={onEnable}>
-        Enable Creator Mode
-      </PixelButton>
-    </div>
   )
 }

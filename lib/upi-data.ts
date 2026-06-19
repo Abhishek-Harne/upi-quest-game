@@ -3,11 +3,18 @@ export type StationId =
   | 'upi-app'
   | 'aggregator'
   | 'sender-bank'
+  | 'internet'
   | 'npci'
   | 'receiver-bank'
   | 'receiver-phone'
 
-export type StationKind = 'phone' | 'app' | 'aggregator' | 'bank' | 'npci'
+export type StationKind =
+  | 'phone'
+  | 'app'
+  | 'aggregator'
+  | 'bank'
+  | 'internet'
+  | 'npci'
 
 export type AccentColor = 'coin' | 'cyan' | 'magenta' | 'primary' | 'green'
 
@@ -137,6 +144,31 @@ export const STATIONS: Station[] = [
     },
     color: 'primary',
     slot: 'senderBank',
+  },
+  {
+    id: 'internet',
+    label: 'Internet',
+    tag: 'SECURE TUNNEL',
+    kind: 'internet',
+    x: 68,
+    y: 55,
+    statusMessage: 'Request encrypted & tunneled across the internet',
+    dialogue:
+      'I am the secure internet tunnel. Your request travels through me wrapped in encryption \u2014 nobody can read or tamper with it in transit.',
+    narration:
+      'The request travels across the internet inside an encrypted, tamper-proof tunnel.',
+    tooltip: {
+      term: 'Secure Tunnel',
+      definition:
+        'UPI traffic moves over the internet inside encrypted TLS tunnels between licensed parties, so data stays private end-to-end.',
+    },
+    xray: {
+      phase: 'Encrypted Transport',
+      detail:
+        'Messages are signed and sent over mutually-authenticated TLS connections; payloads are encrypted so they cannot be read or altered in transit.',
+    },
+    color: 'cyan',
+    slot: null,
   },
   {
     id: 'npci',
