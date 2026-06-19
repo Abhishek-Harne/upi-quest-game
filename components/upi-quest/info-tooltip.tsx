@@ -8,6 +8,8 @@ import { cn } from '@/lib/utils'
 interface InfoTooltipProps {
   term: string
   definition: string
+  fullForm?: string
+  analogy?: string
   accent?: string
   className?: string
   children: React.ReactNode
@@ -19,7 +21,7 @@ interface Coords {
   placement: 'top' | 'bottom'
 }
 
-const TOOLTIP_WIDTH = 224 // w-56
+const TOOLTIP_WIDTH = 288 // w-72, wide enough to avoid clipping full-form + analogy
 
 /**
  * Accessible tooltip that opens on hover/focus (desktop) and on tap (mobile).
@@ -29,6 +31,8 @@ const TOOLTIP_WIDTH = 224 // w-56
 export function InfoTooltip({
   term,
   definition,
+  fullForm,
+  analogy,
   accent = 'var(--arcade-cyan)',
   className,
   children,
@@ -110,7 +114,7 @@ export function InfoTooltip({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ duration: 0.14 }}
-                className="pointer-events-none fixed z-[200] w-56 border-4 bg-popover p-3 text-left shadow-[5px_5px_0_0_rgba(0,0,0,0.55)]"
+                className="pointer-events-none fixed z-[200] w-72 border-4 bg-popover p-3 text-left shadow-[5px_5px_0_0_rgba(0,0,0,0.55)]"
                 style={{
                   top: coords.top,
                   left: coords.left,
@@ -126,9 +130,21 @@ export function InfoTooltip({
                 >
                   {term}
                 </p>
+                {fullForm && (
+                  <p className="mt-1 text-xs font-semibold leading-snug text-popover-foreground">
+                    {fullForm}
+                  </p>
+                )}
                 <p className="mt-1.5 text-xs leading-relaxed text-popover-foreground">
                   {definition}
                 </p>
+                {analogy && (
+                  <p
+                    className="mt-1.5 border-t border-border pt-1.5 text-[11px] italic leading-relaxed text-muted-foreground"
+                  >
+                    {analogy}
+                  </p>
+                )}
               </motion.div>
             )}
           </AnimatePresence>,

@@ -18,11 +18,20 @@ export function FactsCollection() {
     [stats.factsUnlocked],
   )
 
-  const visible = useMemo(
-    () =>
-      FUN_FACTS.filter((f) => filter === 'all' || f.difficulty === filter),
-    [filter],
-  )
+  // Most recently unlocked facts surface first so discovery feels rewarding;
+  // still-locked facts (in natural difficulty order) trail behind them.
+  const visible = useMemo(() => {
+    const byId = new Map(FUN_FACTS.map((f) => [f.id, f]))
+    const unlockedNewestFirst = [...stats.factsUnlocked]
+      .reverse()
+      .map((id) => byId.get(id))
+      .filter((f): f is (typeof FUN_FACTS)[number] => !!f)
+    const unlockedIds = new Set(stats.factsUnlocked)
+    const locked = FUN_FACTS.filter((f) => !unlockedIds.has(f.id))
+    return [...unlockedNewestFirst, ...locked].filter(
+      (f) => filter === 'all' || f.difficulty === filter,
+    )
+  }, [filter, stats.factsUnlocked])
 
   const total = FUN_FACTS.length
   const got = stats.factsUnlocked.length

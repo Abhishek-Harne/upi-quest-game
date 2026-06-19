@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion } from 'motion/react'
 import { Check, ChevronDown, HelpCircle, X } from 'lucide-react'
 import type { AccentColor, Provider, Station } from '@/lib/upi-data'
@@ -44,12 +45,44 @@ export function StationNode({
   className,
 }: StationNodeProps) {
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const [pickerCoords, setPickerCoords] = useState<{
+    top: number
+    left: number
+  } | null>(null)
+  const pickerTriggerRef = useRef<HTMLDivElement>(null)
   const accent = ACCENT_VAR[station.color]
   const active = state === 'active'
   const done = state === 'done'
   const failed = state === 'failed'
   const swappable =
     canCustomize && !!provider && !!providerOptions && !!onSelectProvider
+
+  useEffect(() => setMounted(true), [])
+
+  const computePickerPosition = useCallback(() => {
+    const el = pickerTriggerRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const width = 160
+    const left = Math.min(
+      Math.max(rect.left + rect.width / 2, width / 2 + 8),
+      window.innerWidth - width / 2 - 8,
+    )
+    setPickerCoords({ top: rect.bottom + 4, left })
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!pickerOpen) return
+    computePickerPosition()
+    const onScroll = () => computePickerPosition()
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onScroll)
+    return () => {
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onScroll)
+    }
+  }, [pickerOpen, computePickerPosition])
 
   return (
     <motion.div
@@ -133,7 +166,7 @@ export function StationNode({
 
       {/* Inline provider swap control */}
       {swappable && provider && (
-        <div className="relative mt-1 w-full">
+        <div ref={pickerTriggerRef} className="relative mt-1 w-full">
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -157,50 +190,58 @@ export function StationNode({
             />
           </button>
 
-          {pickerOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-30"
-                onClick={() => setPickerOpen(false)}
-                aria-hidden
-              />
-              <div
-                className="absolute left-1/2 top-full z-40 mt-1 w-[148px] -translate-x-1/2 border-4 bg-popover p-1 shadow-[4px_4px_0_0_rgba(0,0,0,0.5)]"
-                style={{ borderColor: accent }}
-                role="listbox"
-              >
-                {providerOptions!.map((opt) => {
-                  const selected = opt.id === provider.id
-                  return (
-                    <button
-                      key={opt.id}
-                      role="option"
-                      aria-selected={selected}
-                      onClick={() => {
-                        onSelectProvider!(opt.id)
-                        setPickerOpen(false)
-                      }}
-                      className={cn(
-                        'flex w-full items-center gap-2 px-1 py-1 text-left text-[11px] transition-colors hover:bg-muted',
-                        selected && 'bg-muted',
-                      )}
-                    >
-                      <ProviderBadge provider={opt} size="sm" />
-                      <span className="truncate text-popover-foreground">
-                        {opt.name}
-                      </span>
-                      {selected && (
-                        <Check
-                          className="ml-auto h-3 w-3 shrink-0"
-                          style={{ color: accent }}
-                        />
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            </>
-          )}
+          {mounted &&
+            pickerOpen &&
+            pickerCoords &&
+            createPortal(
+              <>
+                <div
+                  className="fixed inset-0 z-[150]"
+                  onClick={() => setPickerOpen(false)}
+                  aria-hidden
+                />
+                <div
+                  className="fixed z-[160] max-h-48 w-40 -translate-x-1/2 overflow-y-auto border-4 bg-popover p-1 shadow-[4px_4px_0_0_rgba(0,0,0,0.5)]"
+                  style={{
+                    borderColor: accent,
+                    top: pickerCoords.top,
+                    left: pickerCoords.left,
+                  }}
+                  role="listbox"
+                >
+                  {providerOptions!.map((opt) => {
+                    const selected = opt.id === provider.id
+                    return (
+                      <button
+                        key={opt.id}
+                        role="option"
+                        aria-selected={selected}
+                        onClick={() => {
+                          onSelectProvider!(opt.id)
+                          setPickerOpen(false)
+                        }}
+                        className={cn(
+                          'flex w-full items-center gap-2 px-1 py-1 text-left text-[11px] transition-colors hover:bg-muted',
+                          selected && 'bg-muted',
+                        )}
+                      >
+                        <ProviderBadge provider={opt} size="sm" />
+                        <span className="truncate text-popover-foreground">
+                          {opt.name}
+                        </span>
+                        {selected && (
+                          <Check
+                            className="ml-auto h-3 w-3 shrink-0"
+                            style={{ color: accent }}
+                          />
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </>,
+              document.body,
+            )}
         </div>
       )}
 
@@ -208,6 +249,8 @@ export function StationNode({
         <InfoTooltip
           term={station.tooltip.term}
           definition={station.tooltip.definition}
+          fullForm={station.tooltip.fullForm}
+          analogy={station.tooltip.analogy}
           accent={accent}
         >
           <span

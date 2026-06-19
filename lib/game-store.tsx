@@ -14,8 +14,9 @@ import {
   getLevel,
   type ModeId,
   type Participants,
+  type TransactionType,
 } from './upi-data'
-import { FUN_FACTS } from './upi-facts'
+import { DIFFICULTY_ORDER, FUN_FACTS } from './upi-facts'
 
 export type TextSize = 'sm' | 'md' | 'lg' | 'xl'
 export type ThemeMode = 'dark' | 'light'
@@ -28,6 +29,8 @@ export interface GameStats {
   scenariosTried: ModeId[]
   cyberWins: number
   timeSpentMs: number
+  switchedTransactionTypes: TransactionType[]
+  completedTransactionTypes: TransactionType[]
 }
 
 export interface GameSettings {
@@ -55,6 +58,8 @@ const DEFAULT_STATS: GameStats = {
   scenariosTried: [],
   cyberWins: 0,
   timeSpentMs: 0,
+  switchedTransactionTypes: [],
+  completedTransactionTypes: [],
 }
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -77,6 +82,8 @@ interface GameStoreValue {
   markScenarioTried: (id: ModeId) => boolean
   recordCyberWin: () => void
   unlockRandomFact: () => string | null
+  markTransactionTypeSwitched: (type: TransactionType) => boolean
+  markTransactionTypeCompleted: (type: TransactionType) => boolean
   setSettings: (patch: Partial<GameSettings>) => void
   setParticipants: (patch: Partial<Participants>) => void
   resetProgress: () => void
@@ -180,18 +187,51 @@ export function GameStoreProvider({ children }: { children: React.ReactNode }) {
     setStats((s) => ({ ...s, cyberWins: s.cyberWins + 1 }))
   }, [])
 
+  // Facts unlock progressively: every Beginner fact before any Intermediate
+  // fact unlocks, every Intermediate before any Advanced, and so on.
   const unlockRandomFact = useCallback((): string | null => {
     let unlockedId: string | null = null
     setStats((s) => {
-      const remaining = FUN_FACTS.filter(
-        (f) => !s.factsUnlocked.includes(f.id),
-      )
-      if (remaining.length === 0) return s
-      const pick = remaining[Math.floor(Math.random() * remaining.length)]
-      unlockedId = pick.id
-      return { ...s, factsUnlocked: [...s.factsUnlocked, pick.id] }
+      const unlockedSet = new Set(s.factsUnlocked)
+      for (const tier of DIFFICULTY_ORDER) {
+        const remainingInTier = FUN_FACTS.filter(
+          (f) => f.difficulty === tier && !unlockedSet.has(f.id),
+        )
+        if (remainingInTier.length === 0) continue
+        const pick =
+          remainingInTier[Math.floor(Math.random() * remainingInTier.length)]
+        unlockedId = pick.id
+        return { ...s, factsUnlocked: [...s.factsUnlocked, pick.id] }
+      }
+      return s
     })
     return unlockedId
+  }, [])
+
+  const markTransactionTypeSwitched = useCallback((type: TransactionType) => {
+    let isNew = false
+    setStats((s) => {
+      if (s.switchedTransactionTypes.includes(type)) return s
+      isNew = true
+      return {
+        ...s,
+        switchedTransactionTypes: [...s.switchedTransactionTypes, type],
+      }
+    })
+    return isNew
+  }, [])
+
+  const markTransactionTypeCompleted = useCallback((type: TransactionType) => {
+    let isNew = false
+    setStats((s) => {
+      if (s.completedTransactionTypes.includes(type)) return s
+      isNew = true
+      return {
+        ...s,
+        completedTransactionTypes: [...s.completedTransactionTypes, type],
+      }
+    })
+    return isNew
   }, [])
 
   const setSettings = useCallback((patch: Partial<GameSettings>) => {
@@ -219,6 +259,8 @@ export function GameStoreProvider({ children }: { children: React.ReactNode }) {
     markScenarioTried,
     recordCyberWin,
     unlockRandomFact,
+    markTransactionTypeSwitched,
+    markTransactionTypeCompleted,
     setSettings,
     setParticipants,
     resetProgress,
