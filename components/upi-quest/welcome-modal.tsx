@@ -1,14 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import {
-  Check,
-  Github,
-  Globe,
-  Heart,
-  Linkedin,
-  PlayCircle,
-} from 'lucide-react'
+import { Briefcase, Check, Code2, Globe, Heart, PlayCircle } from 'lucide-react'
 import { PixelModal } from './pixel-modal'
 import { PixelButton } from './pixel-button'
 
@@ -110,13 +103,13 @@ export function WelcomeModal({
             href="https://www.linkedin.com/in/abhishek-harne/"
             label="LinkedIn"
           >
-            <Linkedin className="h-4 w-4" />
+            <Briefcase className="h-4 w-4" />
           </CreatorLink>
           <CreatorLink
             href="https://github.com/Abhishek-Harne"
             label="GitHub"
           >
-            <Github className="h-4 w-4" />
+            <Code2 className="h-4 w-4" />
           </CreatorLink>
           <CreatorLink
             href="https://abhishekharne.vercel.app/#ai"

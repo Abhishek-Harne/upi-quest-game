@@ -3,13 +3,14 @@
 import { cn } from '@/lib/utils'
 import type { ButtonHTMLAttributes } from 'react'
 
-type Variant = 'primary' | 'accent' | 'magenta' | 'ghost' | 'danger'
+type Variant = 'primary' | 'accent' | 'cyan' | 'magenta' | 'ghost' | 'danger'
 
 const variants: Record<Variant, string> = {
   primary:
     'bg-primary text-primary-foreground border-primary-foreground/30 hover:brightness-110',
   accent:
     'bg-accent text-accent-foreground border-accent-foreground/30 hover:brightness-110',
+  cyan: 'bg-[var(--arcade-cyan)] text-background border-background/30 hover:brightness-110',
   magenta:
     'bg-[var(--arcade-magenta)] text-background border-background/30 hover:brightness-110',
   ghost:

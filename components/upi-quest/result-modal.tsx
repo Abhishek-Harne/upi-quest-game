@@ -2,7 +2,7 @@
 
 import { CheckCircle2, RotateCcw, XCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
-import { formatINR } from '@/lib/upi-data'
+import { STATIONS, formatINR } from '@/lib/upi-data'
 import { PixelButton } from './pixel-button'
 
 export interface ResultData {
@@ -74,7 +74,7 @@ export function ResultModal({
 
             <div className="mt-4 grid grid-cols-3 gap-2">
               <Stat label="Time" value={`${(result.timeMs / 1000).toFixed(1)}s`} />
-              <Stat label="Nodes" value={`${result.nodes}/8`} />
+              <Stat label="Nodes" value={`${result.nodes}/${STATIONS.length}`} />
               <Stat
                 label="XP"
                 value={result.xpEarned > 0 ? `+${result.xpEarned}` : '0'}

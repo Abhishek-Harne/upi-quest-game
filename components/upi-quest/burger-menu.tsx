@@ -5,11 +5,10 @@ import { AnimatePresence, motion } from 'motion/react'
 import {
   ChevronDown,
   Code2,
-  Github,
   Globe,
   Heart,
   Info,
-  Linkedin,
+  Briefcase,
   Settings2,
   Sparkles,
   Trophy,
@@ -211,10 +210,10 @@ export function BurgerMenu({ open, onClose }: BurgerMenuProps) {
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <MenuLink href={APP_META.links.linkedin} label="LinkedIn">
-                    <Linkedin className="h-4 w-4" />
+                    <Briefcase className="h-4 w-4" />
                   </MenuLink>
                   <MenuLink href={APP_META.links.github} label="GitHub">
-                    <Github className="h-4 w-4" />
+                    <Code2 className="h-4 w-4" />
                   </MenuLink>
                   <MenuLink href={APP_META.links.website} label="Website">
                     <Globe className="h-4 w-4" />
