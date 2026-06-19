@@ -293,7 +293,7 @@ export function JourneyMap({
         {/* Infrastructure rail \u2014 this is the "pipeline window" */}
         <div
           className={cn(
-            'scanlines pixel-grid-bg relative flex w-full flex-col items-center gap-1 overflow-hidden border-4 border-border bg-background/60 p-3 sm:p-4 lg:w-auto',
+            'scanlines pixel-grid-bg relative flex w-full shrink-0 flex-col items-center gap-1 overflow-hidden border-4 border-border bg-background/60 p-3 sm:p-4 lg:w-auto',
             xray && 'bg-background/90',
           )}
         >
