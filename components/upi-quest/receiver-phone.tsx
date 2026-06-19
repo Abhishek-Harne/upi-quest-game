@@ -3,16 +3,24 @@
 import { ArrowDownLeft, BellRing } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { formatINR } from '@/lib/upi-data'
+import { cn } from '@/lib/utils'
 
 export function ReceiverPhone({
   received,
   amount,
+  compact = false,
 }: {
   received: boolean
   amount: number
+  compact?: boolean
 }) {
   return (
-    <div className="mx-auto w-full max-w-[280px]">
+    <div
+      className={cn(
+        'mx-auto w-full',
+        compact ? 'max-w-[230px]' : 'max-w-[280px]',
+      )}
+    >
       <motion.div
         animate={received ? { x: [0, -3, 3, -3, 3, 0] } : {}}
         transition={{ duration: 0.5 }}
@@ -20,7 +28,12 @@ export function ReceiverPhone({
       >
         <div className="mx-auto mb-2 h-1.5 w-12 bg-border" />
 
-        <div className="scanlines relative flex min-h-[280px] flex-col border-2 border-border bg-background p-3">
+        <div
+          className={cn(
+            'scanlines relative flex flex-col border-2 border-border bg-background p-3',
+            compact ? 'min-h-[190px]' : 'min-h-[280px]',
+          )}
+        >
           <p className="font-pixel text-[8px] uppercase text-[var(--arcade-magenta)]">
             Receiver
           </p>

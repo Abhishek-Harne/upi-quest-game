@@ -1,6 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   AGGREGATORS,
@@ -15,9 +22,10 @@ import {
 } from '@/lib/upi-data'
 import { ACCENT_VAR, StationNode, type NodeState } from './station-node'
 import { EnergyPacket } from './energy-packet'
+import { ThiefSprite, PoliceSprite } from './cyber-mascots'
 import { cn } from '@/lib/utils'
 
-export type AttackPhase = 'none' | 'incoming' | 'blocked'
+export type AttackPhase = 'none' | 'thief' | 'police'
 
 interface JourneyMapProps {
   activeIndex: number
@@ -30,6 +38,8 @@ interface JourneyMapProps {
   attackPhase: AttackPhase
   onStationClick: (s: Station) => void
   onSelectProvider: (slot: ParticipantSlot, id: string) => void
+  senderPhone: ReactNode
+  receiverPhone: ReactNode
 }
 
 interface Point {
@@ -66,7 +76,10 @@ function providerFor(station: Station, p: Participants) {
   }
 }
 
-// Index of the Internet node, where intrusion attempts surface.
+// First and last stations are the phones; the rest is the infrastructure rail.
+const INFRA = STATIONS.slice(1, -1)
+const LAST = STATIONS.length - 1
+// Index of the Internet node, where heist attempts surface.
 const INTERNET_INDEX = STATIONS.findIndex((s) => s.id === 'internet')
 
 export function JourneyMap({
@@ -80,6 +93,8 @@ export function JourneyMap({
   attackPhase,
   onStationClick,
   onSelectProvider,
+  senderPhone,
+  receiverPhone,
 }: JourneyMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const nodeRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -123,26 +138,8 @@ export function JourneyMap({
     return 'idle'
   }
 
-  function renderNode(s: Station, i: number) {
-    return (
-      <div
-        key={s.id}
-        ref={(el) => {
-          nodeRefs.current[i] = el
-        }}
-      >
-        <StationNode
-          station={s}
-          state={stateFor(i)}
-          provider={providerFor(s, participants)}
-          providerOptions={optionsForSlot(s.slot)}
-          onSelectProvider={(id) => onSelectProvider(s.slot, id)}
-          canCustomize={canCustomize}
-          xray={xray}
-          onClick={() => onStationClick(s)}
-        />
-      </div>
-    )
+  const setRef = (i: number) => (el: HTMLDivElement | null) => {
+    nodeRefs.current[i] = el
   }
 
   const packetPos =
@@ -153,20 +150,20 @@ export function JourneyMap({
     <div
       ref={containerRef}
       className={cn(
-        'scanlines relative overflow-hidden border-4 border-border bg-background/60 p-4 pixel-grid-bg',
+        'scanlines pixel-grid-bg relative overflow-hidden border-4 border-border bg-background/60 p-3 sm:p-4',
         xray && 'bg-background/90',
       )}
     >
-      {/* Pipelines / fiber-optic connectors */}
+      {/* Pipelines / fiber-optic connectors between every slot (phones + infra) */}
       <svg
-        className="pointer-events-none absolute inset-0 h-full w-full"
+        className="pointer-events-none absolute inset-0 z-0 h-full w-full"
         aria-hidden
       >
         {centers.length === STATIONS.length &&
           centers.slice(0, -1).map((c, i) => {
             const next = centers[i + 1]
-            if (!c || !next) return null
-            const reached = i < maxReached || (i === maxReached && maxReached >= 0)
+            if (!c || !next || (c.x === 0 && c.y === 0)) return null
+            const reached = i < maxReached
             const isFailedLink = failedIndex === i + 1
             const accent = isFailedLink
               ? 'var(--destructive)'
@@ -196,45 +193,63 @@ export function JourneyMap({
                       reached || running
                         ? 'dash-flow 0.8s linear infinite'
                         : undefined,
-                    opacity: reached ? 1 : 0.5,
+                    opacity: reached ? 1 : 0.45,
                   }}
-                />
-                <rect
-                  x={(c.x + next.x) / 2 - 3}
-                  y={(c.y + next.y) / 2 - 3}
-                  width={6}
-                  height={6}
-                  fill={reached ? accent : 'var(--muted-foreground)'}
-                  className="animate-router-blink"
                 />
               </g>
             )
           })}
       </svg>
 
-      {/* Internet Highway label */}
-      <div className="pointer-events-none absolute right-3 top-2 z-10 hidden items-center gap-1 sm:flex">
-        <span className="font-pixel text-[7px] uppercase text-muted-foreground">
-          Internet Highway
-        </span>
-      </div>
-
-      {/* Nodes: serpentine on desktop, vertical on mobile */}
-      <div className="relative z-10 flex flex-col items-stretch gap-8 sm:gap-10">
-        {/* Row 1: sender -> upi-app -> aggregator -> sender-bank */}
-        <div className="flex flex-col items-center justify-between gap-8 sm:flex-row sm:items-start">
-          {STATIONS.slice(0, 4).map((s, i) => renderNode(s, i))}
+      {/* Stage: sender phone | infrastructure rail | receiver phone */}
+      <div className="relative z-10 flex flex-col items-center gap-5 lg:flex-row lg:items-center lg:justify-center lg:gap-3">
+        {/* Sender phone */}
+        <div
+          ref={setRef(0)}
+          className="w-full max-w-[230px] shrink-0 lg:w-[220px]"
+        >
+          <p className="mb-1 text-center font-pixel text-[7px] uppercase text-arcade-cyan">
+            You (Payer)
+          </p>
+          {senderPhone}
         </div>
 
-        {/* Row 2: internet -> npci (reversed on desktop for serpentine flow) */}
-        <div className="flex flex-col items-center justify-center gap-8 sm:flex-row-reverse sm:justify-between sm:px-12">
-          {renderNode(STATIONS[4], 4)}
-          {renderNode(STATIONS[5], 5)}
+        {/* Infrastructure rail */}
+        <div className="relative flex w-full flex-col items-center gap-1 lg:w-auto">
+          <span className="hidden font-pixel text-[7px] uppercase text-muted-foreground lg:block">
+            {'\u2193 Payment Rails \u2193'}
+          </span>
+          <div className="flex flex-col items-center gap-5 sm:flex-row sm:flex-nowrap sm:justify-center sm:gap-1 lg:gap-2">
+            {INFRA.map((s, idx) => {
+              const globalIdx = idx + 1
+              return (
+                <div key={s.id} ref={setRef(globalIdx)}>
+                  <StationNode
+                    station={s}
+                    state={stateFor(globalIdx)}
+                    provider={providerFor(s, participants)}
+                    providerOptions={optionsForSlot(s.slot)}
+                    onSelectProvider={(id) => onSelectProvider(s.slot, id)}
+                    canCustomize={canCustomize}
+                    xray={xray}
+                    onClick={() => onStationClick(s)}
+                    className="w-[100px]"
+                  />
+                </div>
+              )
+            })}
+          </div>
         </div>
 
-        {/* Row 3: receiver-bank -> receiver-phone */}
-        <div className="flex flex-col items-center justify-center gap-8 sm:flex-row sm:gap-16">
-          {STATIONS.slice(6).map((s, idx) => renderNode(s, idx + 6))}
+        {/* Receiver phone */}
+        <div
+          ref={setRef(LAST)}
+          className="w-full max-w-[230px] shrink-0 lg:w-[220px]"
+        >
+          <p className="mb-1 text-center font-pixel text-[7px] uppercase text-arcade-magenta">
+            Friend (Payee)
+          </p>
+          {receiverPhone}
         </div>
       </div>
 
@@ -249,34 +264,44 @@ export function JourneyMap({
         </motion.div>
       )}
 
-      {/* Inline intrusion / Guardian event near the Internet node */}
+      {/* Cyber heist: thief grabs the packet, cyber-police chases it back */}
       <AnimatePresence>
         {attackPhase !== 'none' && attackPos && (
           <motion.div
-            key="attack"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
+            key={attackPhase}
+            initial={{ opacity: 0, y: -16, scale: 0.7 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.6 }}
             className="pointer-events-none absolute z-30 flex -translate-x-1/2 flex-col items-center"
-            style={{ left: attackPos.x, top: attackPos.y - 70 }}
+            style={{ left: attackPos.x, top: attackPos.y - 92 }}
           >
-            {attackPhase === 'incoming' ? (
+            {attackPhase === 'thief' ? (
               <>
-                <div className="animate-[hacker-shake_0.5s_steps(2)_infinite] font-mono text-xl leading-none text-destructive crt-glow">
-                  {'[X_X]'}
-                </div>
-                <span className="mt-1 border-2 border-destructive bg-destructive/20 px-1 font-pixel text-[7px] uppercase text-destructive">
-                  Intrusion!
+                <span className="mb-1 border-2 border-destructive bg-destructive/20 px-1 font-pixel text-[7px] uppercase text-destructive crt-glow">
+                  Mine now!
                 </span>
+                <motion.div
+                  animate={{ x: [0, -3, 3, -2, 2, 0] }}
+                  transition={{
+                    duration: 0.5,
+                    repeat: Number.POSITIVE_INFINITY,
+                  }}
+                >
+                  <ThiefSprite pixel={4} />
+                </motion.div>
               </>
             ) : (
               <>
-                <div className="animate-packet-glow font-mono text-xl leading-none text-arcade-cyan crt-glow">
-                  {'[#]'}
-                </div>
-                <span className="mt-1 border-2 border-arcade-cyan bg-arcade-cyan/15 px-1 font-pixel text-[7px] uppercase text-arcade-cyan">
-                  Blocked
+                <span className="mb-1 border-2 border-arcade-cyan bg-arcade-cyan/15 px-1 font-pixel text-[7px] uppercase text-arcade-cyan crt-glow">
+                  Busted!
                 </span>
+                <motion.div
+                  initial={{ x: 30 }}
+                  animate={{ x: 0 }}
+                  transition={{ type: 'spring', stiffness: 140, damping: 12 }}
+                >
+                  <PoliceSprite pixel={4} />
+                </motion.div>
               </>
             )}
           </motion.div>

@@ -12,19 +12,26 @@ export function SenderPhone({
   onSend,
   running,
   overLimit,
+  compact = false,
 }: {
   amount: number
   setAmount: (n: number) => void
   onSend: () => void
   running: boolean
   overLimit: boolean
+  compact?: boolean
 }) {
   function bump(delta: number) {
     setAmount(Math.max(1, amount + delta))
   }
 
   return (
-    <div className="mx-auto w-full max-w-[280px]">
+    <div
+      className={cn(
+        'mx-auto w-full',
+        compact ? 'max-w-[230px]' : 'max-w-[280px]',
+      )}
+    >
       {/* phone body */}
       <div className="relative border-4 border-[var(--arcade-cyan)] bg-card p-3 shadow-[6px_6px_0_0_rgba(0,0,0,0.5)]">
         {/* speaker notch */}
@@ -84,21 +91,25 @@ export function SenderPhone({
           </div>
 
           {/* slider */}
-          <input
-            type="range"
-            min={1}
-            max={UPI_MAX_AMOUNT}
-            step={100}
-            value={Math.min(amount, UPI_MAX_AMOUNT)}
-            disabled={running}
-            onChange={(e) => setAmount(Number(e.target.value))}
-            className="mt-3 w-full accent-[var(--arcade-cyan)]"
-            aria-label="Amount slider"
-          />
-          <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
-            <span>{formatINR(1)}</span>
-            <span>{formatINR(UPI_MAX_AMOUNT)}</span>
-          </div>
+          {!compact && (
+            <>
+              <input
+                type="range"
+                min={1}
+                max={UPI_MAX_AMOUNT}
+                step={100}
+                value={Math.min(amount, UPI_MAX_AMOUNT)}
+                disabled={running}
+                onChange={(e) => setAmount(Number(e.target.value))}
+                className="mt-3 w-full accent-[var(--arcade-cyan)]"
+                aria-label="Amount slider"
+              />
+              <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+                <span>{formatINR(1)}</span>
+                <span>{formatINR(UPI_MAX_AMOUNT)}</span>
+              </div>
+            </>
+          )}
 
           {/* quick chips */}
           <div className="mt-3 grid grid-cols-4 gap-1">
