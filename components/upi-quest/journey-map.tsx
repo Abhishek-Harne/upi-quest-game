@@ -141,16 +141,26 @@ export function JourneyMap({
 
   useLayoutEffect(() => {
     measure()
-  }, [measure, xray])
+    // New nodes mounted by the AnimatePresence mode-switch may not have
+    // their refs attached in the same commit, so follow up once they have.
+    const id = setTimeout(measure, 60)
+    return () => clearTimeout(id)
+  }, [measure, xray, transactionType, attackPhase, statusLine])
 
   useEffect(() => {
     const ro = new ResizeObserver(() => measure())
     if (containerRef.current) ro.observe(containerRef.current)
+    // The journey map's screen position can shift even when its own size
+    // doesn't change (e.g. an educational message above it grows/shrinks
+    // on mode switch), so also watch the document body for reflows.
+    ro.observe(document.body)
     window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, true)
     const id = setTimeout(measure, 100)
     return () => {
       ro.disconnect()
       window.removeEventListener('resize', measure)
+      window.removeEventListener('scroll', measure, true)
       clearTimeout(id)
     }
   }, [measure])
@@ -176,9 +186,20 @@ export function JourneyMap({
     nodeRefs.current[i] = el
   }
 
-  const packetPos =
-    activeIndex >= 0 && centers[activeIndex] ? centers[activeIndex] : centers[0]
-  const attackPos = centers[INTERNET_INDEX]
+  // A point is only trustworthy once its node has actually been measured;
+  // an unmeasured ref reports (0, 0), which would otherwise pin the packet
+  // to the container's top-left corner instead of hiding it.
+  const isMeasured = (p: Point | undefined): p is Point =>
+    !!p && (p.x !== 0 || p.y !== 0)
+
+  const packetPos = isMeasured(centers[activeIndex])
+    ? centers[activeIndex]
+    : isMeasured(centers[0])
+      ? centers[0]
+      : undefined
+  const attackPos = isMeasured(centers[INTERNET_INDEX])
+    ? centers[INTERNET_INDEX]
+    : undefined
   const attackActive = attackPhase !== 'none'
   const brokenLink = (i: number) =>
     attackActive &&
