@@ -96,33 +96,55 @@
   --chart-5: oklch(0.62 0.24 25);
 }
 
-/* Light mode kept as a slightly brighter daytime arcade for the dark toggle off */
+/* Warm retro daytime arcade: cream backgrounds, dark navy text, retro blue + gold */
 .light {
   color-scheme: light;
-  --background: oklch(0.86 0.08 230);
-  --foreground: oklch(0.22 0.08 280);
-  --card: oklch(0.95 0.04 230);
-  --card-foreground: oklch(0.22 0.08 280);
-  --popover: oklch(0.95 0.04 230);
-  --popover-foreground: oklch(0.22 0.08 280);
-  --primary: oklch(0.72 0.17 70);
-  --primary-foreground: oklch(0.2 0.08 280);
-  --secondary: oklch(0.8 0.06 230);
-  --secondary-foreground: oklch(0.22 0.08 280);
-  --muted: oklch(0.82 0.05 230);
-  --muted-foreground: oklch(0.42 0.07 280);
-  --accent: oklch(0.6 0.14 195);
-  --accent-foreground: oklch(0.98 0.02 95);
-  --destructive: oklch(0.58 0.24 25);
-  --destructive-foreground: oklch(0.98 0.02 95);
-  --border: oklch(0.45 0.1 280);
-  --input: oklch(0.78 0.05 230);
-  --ring: oklch(0.6 0.14 195);
-  --coin: oklch(0.78 0.18 80);
-  --coin-glow: oklch(0.85 0.19 88);
-  --arcade-cyan: oklch(0.6 0.14 195);
-  --arcade-magenta: oklch(0.6 0.24 350);
-  --grid: oklch(0.4 0.1 280 / 22%);
+  --background: oklch(0.95 0.035 85);
+  --foreground: oklch(0.24 0.07 265);
+  --card: oklch(0.98 0.02 90);
+  --card-foreground: oklch(0.24 0.07 265);
+  --popover: oklch(0.98 0.02 90);
+  --popover-foreground: oklch(0.24 0.07 265);
+  /* Golden accent */
+  --primary: oklch(0.62 0.15 70);
+  --primary-foreground: oklch(0.99 0.01 90);
+  --secondary: oklch(0.9 0.04 85);
+  --secondary-foreground: oklch(0.24 0.07 265);
+  --muted: oklch(0.91 0.03 85);
+  --muted-foreground: oklch(0.4 0.06 265);
+  /* Retro blue highlight */
+  --accent: oklch(0.5 0.15 250);
+  --accent-foreground: oklch(0.99 0.01 90);
+  --destructive: oklch(0.52 0.22 25);
+  --destructive-foreground: oklch(0.99 0.01 90);
+  --border: oklch(0.36 0.08 265);
+  --input: oklch(0.88 0.03 85);
+  --ring: oklch(0.5 0.15 250);
+  --coin: oklch(0.6 0.16 72);
+  --coin-glow: oklch(0.7 0.17 78);
+  --arcade-cyan: oklch(0.48 0.13 235);
+  --arcade-magenta: oklch(0.5 0.21 350);
+  --grid: oklch(0.4 0.08 265 / 18%);
+
+  --chart-1: oklch(0.6 0.16 72);
+  --chart-2: oklch(0.48 0.13 235);
+  --chart-3: oklch(0.5 0.21 350);
+  --chart-4: oklch(0.5 0.16 150);
+  --chart-5: oklch(0.52 0.22 25);
+}
+
+/* Accessibility: text size scaling applied at the root */
+html[data-text-size='sm'] {
+  font-size: 14px;
+}
+html[data-text-size='md'] {
+  font-size: 16px;
+}
+html[data-text-size='lg'] {
+  font-size: 18px;
+}
+html[data-text-size='xl'] {
+  font-size: 20px;
 }
 
 @layer base {
@@ -237,4 +259,60 @@
   100% {
     opacity: 0.2;
   }
+}
+
+/* Fiber-optic flowing current along pipelines */
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+@keyframes router-blink {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes packet-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px var(--coin-glow));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px var(--coin-glow));
+  }
+}
+
+@keyframes hacker-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
+
+@keyframes signal-travel {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
+  }
+}
+
+.animate-router-blink {
+  animation: router-blink 1.4s steps(2) infinite;
+}
+.animate-packet-glow {
+  animation: packet-glow 1s ease-in-out infinite;
 }
