@@ -56,6 +56,17 @@ const BANK = [
 ]
 const BANK_PAL = { g: C.gold }
 
+const INTERNET = [
+  '..ccc..',
+  '.cgcgc.',
+  'cgcgcgc',
+  'ccgcgcc',
+  'cgcgcgc',
+  '.cgcgc.',
+  '..ccc..',
+]
+const INTERNET_PAL = { c: C.cyan, g: C.dark }
+
 const NPCI = [
   '...r...',
   '..ooo..',
@@ -84,6 +95,8 @@ export function StationArt({
       return <PixelSprite grid={AGG} palette={AGG_PAL} pixel={pixel} />
     case 'bank':
       return <PixelSprite grid={BANK} palette={BANK_PAL} pixel={pixel} />
+    case 'internet':
+      return <PixelSprite grid={INTERNET} palette={INTERNET_PAL} pixel={pixel} />
     case 'npci':
       return <PixelSprite grid={NPCI} palette={NPCI_PAL} pixel={pixel} />
   }

@@ -1,7 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { motion } from 'motion/react'
-import { Check, HelpCircle, X } from 'lucide-react'
+import { Check, ChevronDown, HelpCircle, X } from 'lucide-react'
 import type { AccentColor, Provider, Station } from '@/lib/upi-data'
 import { StationArt } from './station-art'
 import { ProviderBadge } from './provider-badge'
@@ -22,6 +23,10 @@ interface StationNodeProps {
   station: Station
   state: NodeState
   provider?: Provider
+  /** When provided (and not running), the provider line becomes a swap picker. */
+  providerOptions?: Provider[]
+  onSelectProvider?: (id: string) => void
+  canCustomize?: boolean
   xray?: boolean
   onClick: () => void
   className?: string
@@ -31,14 +36,20 @@ export function StationNode({
   station,
   state,
   provider,
+  providerOptions,
+  onSelectProvider,
+  canCustomize,
   xray,
   onClick,
   className,
 }: StationNodeProps) {
+  const [pickerOpen, setPickerOpen] = useState(false)
   const accent = ACCENT_VAR[station.color]
   const active = state === 'active'
   const done = state === 'done'
   const failed = state === 'failed'
+  const swappable =
+    canCustomize && !!provider && !!providerOptions && !!onSelectProvider
 
   return (
     <motion.div
@@ -82,7 +93,9 @@ export function StationNode({
             'grid h-12 place-items-center',
             xray && 'opacity-30 grayscale',
           )}
-          style={{ animation: !active ? 'pixel-bob 3s ease-in-out infinite' : undefined }}
+          style={{
+            animation: !active ? 'pixel-bob 3s ease-in-out infinite' : undefined,
+          }}
         >
           <StationArt kind={station.kind} pixel={4} />
         </div>
@@ -100,22 +113,96 @@ export function StationNode({
           </span>
         )}
 
-        {provider ? (
-          <span className="flex items-center gap-1">
+        {!swappable &&
+          (provider ? (
+            <span className="flex items-center gap-1">
+              <ProviderBadge provider={provider} size="sm" />
+              <span className="text-[10px] leading-none text-muted-foreground">
+                {provider.name}
+              </span>
+            </span>
+          ) : (
+            <span
+              className="text-[9px] uppercase leading-none"
+              style={{ color: accent }}
+            >
+              {station.tag}
+            </span>
+          ))}
+      </button>
+
+      {/* Inline provider swap control */}
+      {swappable && provider && (
+        <div className="relative mt-1 w-full">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setPickerOpen((o) => !o)
+            }}
+            aria-label={`Change ${station.label} provider`}
+            aria-expanded={pickerOpen}
+            className="flex w-full items-center justify-center gap-1 border-2 bg-popover px-1 py-1 text-[10px] leading-none transition-colors hover:brightness-110"
+            style={{ borderColor: accent }}
+          >
             <ProviderBadge provider={provider} size="sm" />
-            <span className="text-[10px] leading-none text-muted-foreground">
+            <span className="truncate text-muted-foreground">
               {provider.name}
             </span>
-          </span>
-        ) : (
-          <span
-            className="text-[9px] uppercase leading-none"
-            style={{ color: accent }}
-          >
-            {station.tag}
-          </span>
-        )}
-      </button>
+            <ChevronDown
+              className={cn(
+                'h-3 w-3 shrink-0 transition-transform',
+                pickerOpen && 'rotate-180',
+              )}
+              style={{ color: accent }}
+            />
+          </button>
+
+          {pickerOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-30"
+                onClick={() => setPickerOpen(false)}
+                aria-hidden
+              />
+              <div
+                className="absolute left-1/2 top-full z-40 mt-1 w-[148px] -translate-x-1/2 border-4 bg-popover p-1 shadow-[4px_4px_0_0_rgba(0,0,0,0.5)]"
+                style={{ borderColor: accent }}
+                role="listbox"
+              >
+                {providerOptions!.map((opt) => {
+                  const selected = opt.id === provider.id
+                  return (
+                    <button
+                      key={opt.id}
+                      role="option"
+                      aria-selected={selected}
+                      onClick={() => {
+                        onSelectProvider!(opt.id)
+                        setPickerOpen(false)
+                      }}
+                      className={cn(
+                        'flex w-full items-center gap-2 px-1 py-1 text-left text-[11px] transition-colors hover:bg-muted',
+                        selected && 'bg-muted',
+                      )}
+                    >
+                      <ProviderBadge provider={opt} size="sm" />
+                      <span className="truncate text-popover-foreground">
+                        {opt.name}
+                      </span>
+                      {selected && (
+                        <Check
+                          className="ml-auto h-3 w-3 shrink-0"
+                          style={{ color: accent }}
+                        />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="absolute -left-1 -top-1 z-20">
         <InfoTooltip
