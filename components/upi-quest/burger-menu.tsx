@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
-  BookOpen,
   ChevronDown,
   Code2,
   Globe,
@@ -21,7 +20,6 @@ import { useGameStore } from '@/lib/game-store'
 import { FUN_FACTS } from '@/lib/upi-facts'
 import { LEVELS, formatDuration } from '@/lib/upi-data'
 import { SettingsPanel } from './settings-panel'
-import { FactsCollection } from './facts-collection'
 import { cn } from '@/lib/utils'
 
 interface BurgerMenuProps {
@@ -32,7 +30,6 @@ interface BurgerMenuProps {
 type SectionId =
   | 'about'
   | 'how'
-  | 'codex'
   | 'achievements'
   | 'settings'
   | 'changelog'
@@ -113,16 +110,6 @@ export function BurgerMenu({ open, onClose }: BurgerMenuProps) {
                     </li>
                   ))}
                 </ol>
-              </Section>
-
-              <Section
-                id="codex"
-                title="Knowledge Codex"
-                icon={<BookOpen className="h-4 w-4" />}
-                open={openSection === 'codex'}
-                onToggle={toggle}
-              >
-                <FactsCollection />
               </Section>
 
               <Section

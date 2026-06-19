@@ -2,7 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import confetti from 'canvas-confetti'
-import { Eye, EyeOff, PlayCircle, ShieldAlert, Sparkles } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import {
+  BookOpen,
+  ChevronDown,
+  Eye,
+  EyeOff,
+  PlayCircle,
+  ShieldAlert,
+  Sparkles,
+} from 'lucide-react'
 import {
   MODES,
   STATIONS,
@@ -27,6 +36,7 @@ import { ModeSelector } from './mode-selector'
 import { DialogueBox } from './dialogue-box'
 import { ResultModal, type ResultData } from './result-modal'
 import { WelcomeModal } from './welcome-modal'
+import { FactsCollection } from './facts-collection'
 import { BurgerMenu } from './burger-menu'
 import { PixelButton } from './pixel-button'
 import { ToastProvider, useToast } from './toast-provider'
@@ -58,7 +68,6 @@ function GameInner() {
   const [running, setRunning] = useState(false)
   const [received, setReceived] = useState(false)
 
-  const [attackArmed, setAttackArmed] = useState(false)
   const [attackPhase, setAttackPhase] = useState<AttackPhase>('none')
 
   const [dialogueStation, setDialogueStation] = useState<Station | null>(null)
@@ -188,46 +197,50 @@ function GameInner() {
         SECURITY_SCENARIOS[scenarioIdx.current % SECURITY_SCENARIOS.length]
       scenarioIdx.current += 1
 
+      // 1. A thief jumps onto the rails and grabs the money packet
       timers.current.push(
         setTimeout(() => {
-          setAttackPhase('incoming')
+          setAttackPhase('thief')
           play('error')
           toast({
             tone: 'error',
-            title: `Intrusion: ${scenario.attack}`,
+            title: `Heist Attempt: ${scenario.attack}`,
             detail: scenario.attackDesc,
           })
         }, baseDelay),
       )
+      // 2. The Cyber Police arrives and busts the thief
       timers.current.push(
         setTimeout(() => {
-          setAttackPhase('blocked')
+          setAttackPhase('police')
           play('success')
           store.recordCyberWin()
-          const newXp = store.addXp(XP.cyberChallenge)
-          void newXp
+          store.addXp(XP.cyberChallenge)
           toast({
             tone: 'cyber',
-            title: `Guardian Blocked It! +${XP.cyberChallenge} XP`,
+            title: `Cyber Police Saved It! +${XP.cyberChallenge} XP`,
             detail: scenario.defenseDesc,
           })
-        }, baseDelay + 700),
+        }, baseDelay + 900),
       )
+      // 3. The money is recovered and the lesson is delivered
       timers.current.push(
         setTimeout(() => {
           setAttackPhase('none')
+          play('coin')
           toast({
             tone: 'fact',
-            title: `Lesson: ${scenario.defense}`,
+            title: `Money Recovered! ${scenario.defense}`,
             detail: scenario.lesson,
           })
-        }, baseDelay + 1700),
+        }, baseDelay + 2100),
       )
     },
     [play, store, toast],
   )
 
-  const runJourney = useCallback(() => {
+  const runJourney = useCallback(
+    (heist = false) => {
     if (running || overLimit) return
     clearTimers()
     const selectedMode = MODES.find((m) => m.id === mode)!
@@ -269,9 +282,9 @@ function GameInner() {
       timers.current.push(t)
     }
 
-    // Inline cyber-attack event at the Internet node on healthy journeys
+    // Cyber heist event at the Internet node on healthy journeys
     const reachesInternet = failIdx < 0 || failIdx > INTERNET_INDEX
-    if (attackArmed && reachesInternet) {
+    if (heist && reachesInternet) {
       triggerAttack(stepMs * INTERNET_INDEX + stepMs * 0.4)
     }
 
@@ -284,20 +297,22 @@ function GameInner() {
           finish(true, null)
         }
       },
-      stepMs * (lastStep + 1),
+      // Give the heist sequence time to resolve before completing
+      stepMs * (lastStep + 1) + (heist && reachesInternet ? 1400 : 0),
     )
     timers.current.push(endT)
-  }, [
-    attackArmed,
-    clearTimers,
-    finish,
-    mode,
-    overLimit,
-    play,
-    running,
-    toast,
-    triggerAttack,
-  ])
+    },
+    [
+      clearTimers,
+      finish,
+      mode,
+      overLimit,
+      play,
+      running,
+      toast,
+      triggerAttack,
+    ],
+  )
 
   const reset = useCallback(() => {
     clearTimers()
@@ -345,36 +360,68 @@ function GameInner() {
     <div className="relative min-h-dvh overflow-hidden text-foreground">
       <ArcadeBackground />
 
-      <main className="relative z-10 mx-auto flex w-full max-w-5xl flex-col gap-4 px-3 py-4 sm:px-6 sm:py-6">
-        {/* Title */}
+      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-3 px-3 py-3 sm:px-5 sm:py-4">
+        {/* Compact title */}
         <div className="text-center">
-          <h1 className="crt-glow font-pixel text-base uppercase leading-relaxed text-coin sm:text-2xl">
+          <h1 className="crt-glow font-pixel text-sm uppercase leading-relaxed text-coin sm:text-xl">
             UPI Quest
           </h1>
-          <p className="mt-2 font-pixel text-[8px] uppercase tracking-wide text-arcade-cyan sm:text-[10px]">
+          <p className="mt-1 font-pixel text-[7px] uppercase tracking-wide text-arcade-cyan sm:text-[9px]">
             Follow Your Money Across India&apos;s Payment Rails
           </p>
         </div>
 
         <Hud onOpenMenu={() => setMenuOpen(true)} />
 
-        {/* Phones */}
-        <div className="grid gap-4 lg:grid-cols-2">
-          <SenderPhone
-            amount={amount}
-            setAmount={setAmount}
-            onSend={runJourney}
-            running={running}
-            overLimit={overLimit}
-          />
-          <ReceiverPhone received={received} amount={amount} />
-        </div>
+        {/* Transaction stage: payer phone -> infrastructure -> payee phone.
+            This is the dominant, above-the-fold centerpiece. */}
+        <JourneyMap
+          activeIndex={activeIndex}
+          maxReached={maxReached}
+          failedIndex={failedIndex}
+          running={running}
+          xray={store.settings.xray}
+          canCustomize={!running}
+          participants={store.participants}
+          attackPhase={attackPhase}
+          onStationClick={onStationClick}
+          onSelectProvider={onSelectProvider}
+          senderPhone={
+            <SenderPhone
+              amount={amount}
+              setAmount={setAmount}
+              onSend={() => runJourney(false)}
+              running={running}
+              overLimit={overLimit}
+              compact
+            />
+          }
+          receiverPhone={
+            <ReceiverPhone received={received} amount={amount} compact />
+          }
+        />
 
-        {/* Scenario selector */}
-        <ModeSelector selected={mode} onSelect={setMode} disabled={running} />
-
-        {/* Toggles: X-Ray + Simulate Attack */}
+        {/* Primary actions */}
         <div className="flex flex-wrap items-center justify-center gap-2">
+          <PixelButton variant="ghost" onClick={reset} disabled={running}>
+            Reset
+          </PixelButton>
+          <PixelButton
+            variant="primary"
+            onClick={() => runJourney(false)}
+            disabled={running || overLimit}
+          >
+            <PlayCircle className="h-4 w-4" />
+            {running ? 'Routing...' : 'Send Payment'}
+          </PixelButton>
+          <PixelButton
+            variant="danger"
+            onClick={() => runJourney(true)}
+            disabled={running || overLimit}
+          >
+            <ShieldAlert className="h-4 w-4" />
+            Let&apos;s Steal Some Money
+          </PixelButton>
           <ToggleChip
             active={store.settings.xray}
             onClick={() => store.setSettings({ xray: !store.settings.xray })}
@@ -389,44 +436,10 @@ function GameInner() {
           >
             X-Ray Mode
           </ToggleChip>
-          <ToggleChip
-            active={attackArmed}
-            onClick={() => setAttackArmed((a) => !a)}
-            activeClass="border-destructive bg-destructive/10 text-destructive"
-            icon={<ShieldAlert className="h-3.5 w-3.5" />}
-          >
-            {attackArmed ? 'Attack Armed' : 'Simulate Attack'}
-          </ToggleChip>
         </div>
 
-        {/* Journey map (always the centerpiece) */}
-        <JourneyMap
-          activeIndex={activeIndex}
-          maxReached={maxReached}
-          failedIndex={failedIndex}
-          running={running}
-          xray={store.settings.xray}
-          canCustomize={!running}
-          participants={store.participants}
-          attackPhase={attackPhase}
-          onStationClick={onStationClick}
-          onSelectProvider={onSelectProvider}
-        />
-
-        {/* Actions */}
-        <div className="flex flex-wrap justify-center gap-2">
-          <PixelButton variant="ghost" onClick={reset} disabled={running}>
-            Reset
-          </PixelButton>
-          <PixelButton
-            variant="primary"
-            onClick={runJourney}
-            disabled={running || overLimit}
-          >
-            <PlayCircle className="h-4 w-4" />
-            {running ? 'Routing...' : 'Send Payment'}
-          </PixelButton>
-        </div>
+        {/* Scenario selector (secondary) */}
+        <ModeSelector selected={mode} onSelect={setMode} disabled={running} />
 
         {/* Inline discovery reveal */}
         {lastFact && (
@@ -446,10 +459,13 @@ function GameInner() {
           </div>
         )}
 
+        {/* Knowledge Codex, surfaced on the main screen */}
+        <MainCodex />
+
         <p className="text-center font-mono text-xs leading-relaxed text-muted-foreground">
           Tap any station to learn what it does and earn XP. Tap a provider chip
-          to swap your UPI app, aggregator or banks. Arm an attack to watch the
-          Cyber Guardian defend your money in transit.
+          to swap your UPI app, aggregator or banks. Hit &quot;Let&apos;s Steal
+          Some Money&quot; to watch the Cyber Police defend your cash in transit.
         </p>
       </main>
 
@@ -469,6 +485,61 @@ function GameInner() {
         }}
       />
     </div>
+  )
+}
+
+function MainCodex() {
+  const { stats } = useGameStore()
+  const [open, setOpen] = useState(false)
+  const got = stats.factsUnlocked.length
+  const total = FUN_FACTS.length
+
+  return (
+    <section className="border-4 border-coin/60 bg-card shadow-[5px_5px_0_0_rgba(0,0,0,0.5)]">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 px-3 py-3 text-left"
+      >
+        <span className="grid h-8 w-8 shrink-0 place-items-center border-2 border-coin bg-coin/15 text-coin">
+          <BookOpen className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-pixel text-[9px] uppercase text-coin">
+            Knowledge Codex
+          </span>
+          <span className="mt-1 block h-2 w-full max-w-xs overflow-hidden border border-border bg-background">
+            <span
+              className="block h-full bg-coin transition-all"
+              style={{ width: `${(got / total) * 100}%` }}
+            />
+          </span>
+        </span>
+        <span className="shrink-0 font-mono text-xs text-coin">
+          {got}/{total}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+            open ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="border-t-2 border-border p-3">
+              <FactsCollection />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
   )
 }
 

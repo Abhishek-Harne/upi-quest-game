@@ -16,14 +16,6 @@ export function Hud({ onOpenMenu }: { onOpenMenu: () => void }) {
   return (
     <header className="flex flex-col gap-3 border-4 border-border bg-card p-3 shadow-[5px_5px_0_0_rgba(0,0,0,0.5)]">
       <div className="flex items-center gap-3">
-        <button
-          onClick={onOpenMenu}
-          aria-label="Open menu"
-          className="flex h-10 w-10 shrink-0 items-center justify-center border-2 border-border bg-background text-foreground shadow-[3px_3px_0_0_rgba(0,0,0,0.5)] transition-all hover:border-arcade-cyan active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_0_rgba(0,0,0,0.5)]"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-
         <div className="flex h-10 w-10 shrink-0 items-center justify-center border-2 border-coin bg-coin/15">
           <Trophy className="h-5 w-5 text-coin" />
         </div>
@@ -37,7 +29,7 @@ export function Hud({ onOpenMenu }: { onOpenMenu: () => void }) {
         </div>
 
         {/* XP bar */}
-        <div className="ml-auto flex min-w-0 max-w-[40%] flex-1 flex-col gap-1 sm:max-w-xs">
+        <div className="ml-auto flex min-w-0 max-w-[38%] flex-1 flex-col gap-1 sm:max-w-xs">
           <div className="flex items-center justify-between text-[11px] uppercase text-muted-foreground">
             <span>XP {stats.xp}</span>
             <span>{next ? `Next: ${next.minXp}` : 'MAX'}</span>
@@ -50,6 +42,14 @@ export function Hud({ onOpenMenu }: { onOpenMenu: () => void }) {
             />
           </div>
         </div>
+
+        <button
+          onClick={onOpenMenu}
+          aria-label="Open menu"
+          className="flex h-10 w-10 shrink-0 items-center justify-center border-2 border-border bg-background text-foreground shadow-[3px_3px_0_0_rgba(0,0,0,0.5)] transition-all hover:border-arcade-cyan active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_0_rgba(0,0,0,0.5)]"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
       </div>
 
       {/* Session stats strip */}
