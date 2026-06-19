@@ -26,6 +26,41 @@ export type ParticipantSlot =
   | 'receiverBank'
   | null
 
+/**
+ * Real UPI transactions follow different participant chains depending on
+ * who is being paid. Personal (P2P) transfers skip the payment aggregator
+ * entirely, while business (P2M) payments route through one.
+ */
+export type TransactionType = 'personal' | 'business'
+
+export interface TransactionTypeInfo {
+  id: TransactionType
+  label: string
+  icon: string
+  description: string
+  educationalMessage: string
+}
+
+export const TRANSACTION_TYPES: TransactionTypeInfo[] = [
+  {
+    id: 'personal',
+    label: 'Personal Payment',
+    icon: '\u{1F465}',
+    description:
+      'Sending money to a friend, family member or another individual.',
+    educationalMessage:
+      'Personal payments travel directly through the UPI banking ecosystem.',
+  },
+  {
+    id: 'business',
+    label: 'Business Payment',
+    icon: '\u{1F6D2}',
+    description: 'Paying a merchant or business — QR, app or checkout.',
+    educationalMessage:
+      'Business payments often pass through a payment aggregator before reaching the bank.',
+  },
+]
+
 export interface Station {
   id: StationId
   label: string
@@ -51,6 +86,8 @@ export interface Station {
   xray: { phase: string; detail: string }
   color: AccentColor
   slot: ParticipantSlot
+  /** Which transaction type(s) include this station in the journey. */
+  modes: TransactionType[]
 }
 
 export const STATIONS: Station[] = [
@@ -79,6 +116,7 @@ export const STATIONS: Station[] = [
     },
     color: 'cyan',
     slot: null,
+    modes: ['personal', 'business'],
   },
   {
     id: 'upi-app',
@@ -106,6 +144,7 @@ export const STATIONS: Station[] = [
     },
     color: 'cyan',
     slot: 'app',
+    modes: ['personal', 'business'],
   },
   {
     id: 'aggregator',
@@ -122,9 +161,9 @@ export const STATIONS: Station[] = [
       term: 'Aggregator',
       fullForm: 'Payment Aggregator',
       definition:
-        'A licensed entity (Razorpay, BharatPe, Cashfree) that helps businesses accept digital payments without building their own payment infrastructure.',
+        'Helps businesses accept payments without building payment infrastructure themselves (e.g. Razorpay, BharatPe, Cashfree, PayU).',
       analogy:
-        'Think of an aggregator as a delivery partner that collects parcels from customers and routes them through the logistics network.',
+        'Think of an aggregator like a logistics company that helps merchants connect to the broader payment network.',
     },
     xray: {
       phase: 'Validation',
@@ -133,6 +172,7 @@ export const STATIONS: Station[] = [
     },
     color: 'magenta',
     slot: 'aggregator',
+    modes: ['business'],
   },
   {
     id: 'sender-bank',
@@ -160,6 +200,7 @@ export const STATIONS: Station[] = [
     },
     color: 'primary',
     slot: 'senderBank',
+    modes: ['personal', 'business'],
   },
   {
     id: 'internet',
@@ -188,6 +229,7 @@ export const STATIONS: Station[] = [
     },
     color: 'cyan',
     slot: null,
+    modes: ['personal', 'business'],
   },
   {
     id: 'npci',
@@ -215,6 +257,7 @@ export const STATIONS: Station[] = [
     },
     color: 'coin',
     slot: null,
+    modes: ['personal', 'business'],
   },
   {
     id: 'receiver-bank',
@@ -241,6 +284,7 @@ export const STATIONS: Station[] = [
     },
     color: 'primary',
     slot: 'receiverBank',
+    modes: ['personal', 'business'],
   },
   {
     id: 'receiver-phone',
@@ -265,8 +309,14 @@ export const STATIONS: Station[] = [
     },
     color: 'green',
     slot: null,
+    modes: ['personal', 'business'],
   },
 ]
+
+/** Stations that belong to a given transaction type's journey, in order. */
+export function stationsForType(type: TransactionType): Station[] {
+  return STATIONS.filter((s) => s.modes.includes(type))
+}
 
 export const UPI_MAX_AMOUNT = 100000
 
@@ -293,6 +343,7 @@ export const AGGREGATORS: Provider[] = [
   { id: 'razorpay', name: 'Razorpay', color: '#3f7fff', initials: 'Rz', description: 'Popular payment gateway for businesses.' },
   { id: 'bharatpe', name: 'BharatPe', color: '#0d2366', initials: 'BP', description: 'Merchant-focused payments and QR.' },
   { id: 'cashfree', name: 'Cashfree', color: '#0baf60', initials: 'Cf', description: 'Payments and payouts platform.' },
+  { id: 'payu', name: 'PayU', color: '#fab90d', initials: 'Pu', description: 'Global payment gateway used by many merchants.' },
 ]
 
 export const BANKS: Provider[] = [
@@ -430,6 +481,10 @@ export const XP = {
   unlockFact: 5,
   failureScenario: 20,
   cyberChallenge: 25,
+  firstPersonalPayment: 10,
+  firstBusinessPayment: 15,
+  firstModeSwitch: 10,
+  viewAggregator: 5,
 } as const
 
 export function formatINR(amount: number): string {

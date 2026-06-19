@@ -13,21 +13,24 @@ import {
   ShieldAlert,
   Sparkles,
   Sun,
+  Type,
 } from 'lucide-react'
 import {
   MODES,
-  STATIONS,
+  TRANSACTION_TYPES,
   UPI_MAX_AMOUNT,
   XP,
   getLevel,
   formatINR,
+  stationsForType,
   type ModeId,
   type ParticipantSlot,
   type Station,
+  type TransactionType,
 } from '@/lib/upi-data'
 import { FUN_FACTS, type FunFact } from '@/lib/upi-facts'
 import { SECURITY_SCENARIOS } from '@/lib/security-data'
-import { GameStoreProvider, useGameStore } from '@/lib/game-store'
+import { GameStoreProvider, useGameStore, type TextSize } from '@/lib/game-store'
 import { useArcadeSound } from '@/lib/use-arcade-sound'
 import { ArcadeBackground } from './arcade-background'
 import { Hud } from './hud'
@@ -44,7 +47,7 @@ import { PixelButton } from './pixel-button'
 import { ToastProvider, useToast } from './toast-provider'
 
 const STEP_BASE_MS = 850
-const INTERNET_INDEX = STATIONS.findIndex((s) => s.id === 'internet')
+const TEXT_SIZES: TextSize[] = ['sm', 'md', 'lg', 'xl']
 
 export function UpiQuestGame() {
   return (
@@ -63,6 +66,10 @@ function GameInner() {
 
   const [amount, setAmount] = useState(500)
   const [mode, setMode] = useState<ModeId>('normal')
+  const [transactionType, setTransactionType] = useState<TransactionType>('personal')
+
+  const stations = stationsForType(transactionType)
+  const INTERNET_INDEX = stations.findIndex((s) => s.id === 'internet')
 
   const [activeIndex, setActiveIndex] = useState(-1)
   const [maxReached, setMaxReached] = useState(-1)
@@ -71,6 +78,7 @@ function GameInner() {
   const [received, setReceived] = useState(false)
 
   const [attackPhase, setAttackPhase] = useState<AttackPhase>('none')
+  const [attackPhaseMs, setAttackPhaseMs] = useState(1500)
   const [attackScenario, setAttackScenario] = useState<
     (typeof SECURITY_SCENARIOS)[number] | null
   >(null)
@@ -128,7 +136,7 @@ function GameInner() {
   const finish = useCallback(
     (success: boolean, failIdx: number | null, failMessage?: string) => {
       const timeMs = Date.now() - startedAt.current
-      const nodes = success ? STATIONS.length : (failIdx ?? 0)
+      const nodes = success ? stations.length : (failIdx ?? 0)
       const selectedMode = MODES.find((m) => m.id === mode)!
 
       let xpEarned = 0
@@ -156,8 +164,25 @@ function GameInner() {
         toast({
           tone: 'success',
           title: 'Transaction Complete',
-          detail: `${formatINR(amount)} delivered across all ${STATIONS.length} stations`,
+          detail: `${formatINR(amount)} delivered across all ${stations.length} stations`,
         })
+
+        const isFirstOfType = store.markTransactionTypeCompleted(transactionType)
+        if (isFirstOfType) {
+          const bonusXp =
+            transactionType === 'personal'
+              ? XP.firstPersonalPayment
+              : XP.firstBusinessPayment
+          xpEarned += bonusXp
+          toast({
+            tone: 'xp',
+            title: `First ${transactionType === 'personal' ? 'Personal' : 'Business'} Payment: +${bonusXp} XP`,
+            detail:
+              transactionType === 'personal'
+                ? 'You completed your first person-to-person UPI payment.'
+                : 'You completed your first merchant UPI payment.',
+          })
+        }
       } else {
         play('error')
         toast({
@@ -194,7 +219,7 @@ function GameInner() {
       setRunning(false)
       setResult({ success, amount, timeMs, nodes, xpEarned, failMessage })
     },
-    [amount, celebrate, mode, play, store, toast],
+    [amount, celebrate, mode, play, stations.length, store, toast, transactionType],
   )
 
   // Arcade-style cyber heist: an ~20s beat-by-beat sequence that fully halts
@@ -210,12 +235,12 @@ function GameInner() {
       setAttackScenario(scenario)
 
       const beats: Array<{ phase: AttackPhase; ms: number; onStart?: () => void }> = [
-        { phase: 'warning', ms: 1500, onStart: () => play('alarm') },
-        { phase: 'thief', ms: 2800, onStart: () => play('error') },
-        { phase: 'narration', ms: 5200 },
-        { phase: 'siren', ms: 1500, onStart: () => play('siren') },
-        { phase: 'guardian', ms: 3200, onStart: () => play('success') },
-        { phase: 'recovery', ms: 3800, onStart: () => play('coin') },
+        { phase: 'warning', ms: 2200, onStart: () => play('alarm') },
+        { phase: 'thief', ms: 4000, onStart: () => play('error') },
+        { phase: 'narration', ms: 7000 },
+        { phase: 'siren', ms: 2200, onStart: () => play('siren') },
+        { phase: 'guardian', ms: 4400, onStart: () => play('success') },
+        { phase: 'recovery', ms: 5000, onStart: () => play('coin') },
       ]
 
       let elapsed = 0
@@ -223,6 +248,7 @@ function GameInner() {
         timers.current.push(
           setTimeout(() => {
             setAttackPhase(beat.phase)
+            setAttackPhaseMs(beat.ms)
             beat.onStart?.()
           }, elapsed),
         )
@@ -253,14 +279,14 @@ function GameInner() {
       clearTimers()
       const selectedMode = MODES.find((m) => m.id === mode)!
       const failIdx = selectedMode.failAt
-        ? STATIONS.findIndex((s) => s.id === selectedMode.failAt)
+        ? stations.findIndex((s) => s.id === selectedMode.failAt)
         : -1
 
       setResult(null)
       setReceived(false)
       setFailedIndex(null)
       setAttackPhase('none')
-      setStatusLine(STATIONS[0].statusMessage)
+      setStatusLine(stations[0].statusMessage)
       setActiveIndex(0)
       setMaxReached(0)
       setRunning(true)
@@ -268,7 +294,7 @@ function GameInner() {
       play('send')
 
       const stepMs = STEP_BASE_MS / selectedMode.speed
-      const lastStep = failIdx >= 0 ? failIdx : STATIONS.length - 1
+      const lastStep = failIdx >= 0 ? failIdx : stations.length - 1
       const reachesInternet = failIdx < 0 || failIdx > INTERNET_INDEX
       const heistAtInternet = heist && reachesInternet
 
@@ -281,8 +307,8 @@ function GameInner() {
           if (failIdx >= 0) {
             finish(false, failIdx, selectedMode.failMessage)
           } else {
-            setActiveIndex(STATIONS.length - 1)
-            setStatusLine(STATIONS[STATIONS.length - 1].statusMessage)
+            setActiveIndex(stations.length - 1)
+            setStatusLine(stations[stations.length - 1].statusMessage)
             finish(true, null)
           }
           return
@@ -291,7 +317,7 @@ function GameInner() {
         const t = setTimeout(() => {
           setActiveIndex(i)
           setMaxReached((m) => Math.max(m, i))
-          const st = STATIONS[i]
+          const st = stations[i]
           if (failIdx >= 0 && i === failIdx) {
             setFailedIndex(i)
             play('error')
@@ -312,7 +338,17 @@ function GameInner() {
 
       step(1)
     },
-    [clearTimers, finish, mode, overLimit, play, running, triggerAttack],
+    [
+      INTERNET_INDEX,
+      clearTimers,
+      finish,
+      mode,
+      overLimit,
+      play,
+      running,
+      stations,
+      triggerAttack,
+    ],
   )
 
   const reset = useCallback(() => {
@@ -333,10 +369,11 @@ function GameInner() {
       play('blip')
       if (!readNodes.current.has(s.id)) {
         readNodes.current.add(s.id)
-        store.addXp(XP.readNode)
+        const bonus = s.id === 'aggregator' ? XP.viewAggregator : XP.readNode
+        store.addXp(bonus)
         toast({
           tone: 'xp',
-          title: `+${XP.readNode} XP`,
+          title: `+${bonus} XP`,
           detail: `Studied ${s.label}`,
         })
       }
@@ -358,26 +395,80 @@ function GameInner() {
     setTimeout(() => runJourney(), 400)
   }, [runJourney])
 
+  const hasSwitchedModeBefore = useRef(false)
+
+  const onSelectTransactionType = useCallback(
+    (type: TransactionType) => {
+      if (running || type === transactionType) return
+      reset()
+      setTransactionType(type)
+      play('blip')
+
+      const info = TRANSACTION_TYPES.find((t) => t.id === type)!
+      const isNewType = store.markTransactionTypeSwitched(type)
+
+      let xpEarned = 0
+      if (isNewType) {
+        toast({
+          tone: 'fact',
+          title: `${info.icon} ${info.label}`,
+          detail:
+            type === 'personal'
+              ? 'Used when sending money directly to another person. Examples: Friends, Family, Roommates. No payment aggregator is involved.'
+              : 'Used when paying a business or merchant. Examples: QR payments, Ecommerce, Food delivery, Subscriptions. Payment aggregators may help merchants collect and manage payments.',
+        })
+      }
+      if (!hasSwitchedModeBefore.current) {
+        hasSwitchedModeBefore.current = true
+        xpEarned += XP.firstModeSwitch
+        toast({
+          tone: 'xp',
+          title: `+${XP.firstModeSwitch} XP`,
+          detail: 'Switched transaction modes for the first time',
+        })
+      }
+      if (xpEarned > 0) {
+        store.addXp(xpEarned)
+        play('coin')
+      }
+    },
+    [play, reset, running, store, toast, transactionType],
+  )
+
   return (
     <div className="relative min-h-dvh overflow-hidden text-foreground">
       <ArcadeBackground />
 
-      {/* Always-visible quick theme toggle, independent of the burger menu */}
-      <button
-        onClick={() =>
-          store.setSettings({
-            theme: store.settings.theme === 'dark' ? 'light' : 'dark',
-          })
-        }
-        aria-label="Toggle theme"
-        className="fixed bottom-4 right-4 z-[70] flex h-11 w-11 items-center justify-center border-2 border-coin bg-card text-coin shadow-[3px_3px_0_0_rgba(0,0,0,0.5)] transition-all hover:brightness-110 active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_0_rgba(0,0,0,0.5)]"
-      >
-        {store.settings.theme === 'dark' ? (
-          <Sun className="h-5 w-5" />
-        ) : (
-          <Moon className="h-5 w-5" />
-        )}
-      </button>
+      {/* Always-visible quick theme + text-size toggles, independent of the burger menu */}
+      <div className="fixed bottom-4 right-4 z-[70] flex flex-col gap-2">
+        <button
+          onClick={() => {
+            const idx = TEXT_SIZES.indexOf(store.settings.textSize)
+            const next = TEXT_SIZES[(idx + 1) % TEXT_SIZES.length]
+            store.setSettings({ textSize: next })
+          }}
+          aria-label="Cycle text size"
+          title={`Text size: ${store.settings.textSize.toUpperCase()}`}
+          className="flex h-11 w-11 items-center justify-center border-2 border-arcade-cyan bg-card text-arcade-cyan shadow-[3px_3px_0_0_rgba(0,0,0,0.5)] transition-all hover:brightness-110 active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_0_rgba(0,0,0,0.5)]"
+        >
+          <Type className="h-5 w-5" />
+        </button>
+        <button
+          onClick={() =>
+            store.setSettings({
+              theme: store.settings.theme === 'dark' ? 'light' : 'dark',
+            })
+          }
+          aria-label="Toggle theme"
+          className="flex h-11 w-11 items-center justify-center border-2 border-coin bg-card text-coin shadow-[3px_3px_0_0_rgba(0,0,0,0.5)] transition-all hover:brightness-110 active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_0_rgba(0,0,0,0.5)]"
+        >
+          {store.settings.theme === 'dark' ? (
+            <Sun className="h-5 w-5" />
+          ) : (
+            <Moon className="h-5 w-5" />
+          )}
+        </button>
+      </div>
 
       <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-3 px-3 py-3 sm:px-5 sm:py-4">
         {/* Compact title */}
@@ -392,9 +483,40 @@ function GameInner() {
 
         <Hud onOpenMenu={() => setMenuOpen(true)} />
 
+        {/* Transaction Type Selector: switches the whole infra map between
+            Personal (P2P, no aggregator) and Business (P2M, via aggregator). */}
+        <div className="flex flex-col items-center gap-1.5">
+          <span className="font-pixel text-[7px] uppercase text-muted-foreground">
+            Transaction Type
+          </span>
+          <div className="flex gap-2">
+            {TRANSACTION_TYPES.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => onSelectTransactionType(t.id)}
+                disabled={running}
+                aria-pressed={transactionType === t.id}
+                className={`flex items-center gap-1.5 border-2 px-3 py-1.5 font-mono text-xs uppercase transition-colors disabled:opacity-50 ${
+                  transactionType === t.id
+                    ? 'border-coin bg-coin/10 text-coin'
+                    : 'border-border bg-background text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <span>{t.icon}</span>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <p className="max-w-md text-center font-mono text-[11px] leading-relaxed text-muted-foreground">
+            {TRANSACTION_TYPES.find((t) => t.id === transactionType)?.educationalMessage}
+          </p>
+        </div>
+
         {/* Transaction stage: payer phone -> infrastructure -> payee phone.
             This is the dominant, above-the-fold centerpiece. */}
         <JourneyMap
+          stations={stations}
+          transactionType={transactionType}
           activeIndex={activeIndex}
           maxReached={maxReached}
           failedIndex={failedIndex}
@@ -403,6 +525,7 @@ function GameInner() {
           canCustomize={!running}
           participants={store.participants}
           attackPhase={attackPhase}
+          attackPhaseMs={attackPhaseMs}
           attackScenario={attackScenario}
           statusLine={statusLine}
           onStationClick={onStationClick}

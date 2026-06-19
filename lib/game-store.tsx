@@ -14,6 +14,7 @@ import {
   getLevel,
   type ModeId,
   type Participants,
+  type TransactionType,
 } from './upi-data'
 import { DIFFICULTY_ORDER, FUN_FACTS } from './upi-facts'
 
@@ -28,6 +29,8 @@ export interface GameStats {
   scenariosTried: ModeId[]
   cyberWins: number
   timeSpentMs: number
+  switchedTransactionTypes: TransactionType[]
+  completedTransactionTypes: TransactionType[]
 }
 
 export interface GameSettings {
@@ -55,6 +58,8 @@ const DEFAULT_STATS: GameStats = {
   scenariosTried: [],
   cyberWins: 0,
   timeSpentMs: 0,
+  switchedTransactionTypes: [],
+  completedTransactionTypes: [],
 }
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -77,6 +82,8 @@ interface GameStoreValue {
   markScenarioTried: (id: ModeId) => boolean
   recordCyberWin: () => void
   unlockRandomFact: () => string | null
+  markTransactionTypeSwitched: (type: TransactionType) => boolean
+  markTransactionTypeCompleted: (type: TransactionType) => boolean
   setSettings: (patch: Partial<GameSettings>) => void
   setParticipants: (patch: Partial<Participants>) => void
   resetProgress: () => void
@@ -201,6 +208,32 @@ export function GameStoreProvider({ children }: { children: React.ReactNode }) {
     return unlockedId
   }, [])
 
+  const markTransactionTypeSwitched = useCallback((type: TransactionType) => {
+    let isNew = false
+    setStats((s) => {
+      if (s.switchedTransactionTypes.includes(type)) return s
+      isNew = true
+      return {
+        ...s,
+        switchedTransactionTypes: [...s.switchedTransactionTypes, type],
+      }
+    })
+    return isNew
+  }, [])
+
+  const markTransactionTypeCompleted = useCallback((type: TransactionType) => {
+    let isNew = false
+    setStats((s) => {
+      if (s.completedTransactionTypes.includes(type)) return s
+      isNew = true
+      return {
+        ...s,
+        completedTransactionTypes: [...s.completedTransactionTypes, type],
+      }
+    })
+    return isNew
+  }, [])
+
   const setSettings = useCallback((patch: Partial<GameSettings>) => {
     setSettingsState((s) => ({ ...s, ...patch }))
   }, [])
@@ -226,6 +259,8 @@ export function GameStoreProvider({ children }: { children: React.ReactNode }) {
     markScenarioTried,
     recordCyberWin,
     unlockRandomFact,
+    markTransactionTypeSwitched,
+    markTransactionTypeCompleted,
     setSettings,
     setParticipants,
     resetProgress,

@@ -12,13 +12,13 @@ import { AnimatePresence, motion } from 'motion/react'
 import {
   AGGREGATORS,
   BANKS,
-  STATIONS,
   UPI_APPS,
   providerById,
   type Participants,
   type ParticipantSlot,
   type Provider,
   type Station,
+  type TransactionType,
 } from '@/lib/upi-data'
 import { ACCENT_VAR, StationNode, type NodeState } from './station-node'
 import { EnergyPacket } from './energy-packet'
@@ -36,6 +36,8 @@ export type AttackPhase =
   | 'recovery'
 
 interface JourneyMapProps {
+  stations: Station[]
+  transactionType: TransactionType
   activeIndex: number
   maxReached: number
   failedIndex: number | null
@@ -44,6 +46,7 @@ interface JourneyMapProps {
   canCustomize: boolean
   participants: Participants
   attackPhase: AttackPhase
+  attackPhaseMs: number
   attackScenario: (typeof SECURITY_SCENARIOS)[number] | null
   statusLine: string | null
   onStationClick: (s: Station) => void
@@ -86,13 +89,14 @@ function providerFor(station: Station, p: Participants) {
   }
 }
 
-// First and last stations are the phones; the rest is the infrastructure rail.
-const INFRA = STATIONS.slice(1, -1)
-const LAST = STATIONS.length - 1
-// Index of the Internet node, where heist attempts surface.
-const INTERNET_INDEX = STATIONS.findIndex((s) => s.id === 'internet')
+const PHONE_LABELS: Record<TransactionType, { sender: string; receiver: string }> = {
+  personal: { sender: 'You (Payer)', receiver: 'Friend (Payee)' },
+  business: { sender: 'You (Customer)', receiver: 'Merchant' },
+}
 
 export function JourneyMap({
+  stations,
+  transactionType,
   activeIndex,
   maxReached,
   failedIndex,
@@ -101,6 +105,7 @@ export function JourneyMap({
   canCustomize,
   participants,
   attackPhase,
+  attackPhaseMs,
   attackScenario,
   statusLine,
   onStationClick,
@@ -108,6 +113,13 @@ export function JourneyMap({
   senderPhone,
   receiverPhone,
 }: JourneyMapProps) {
+  // First and last stations are the phones; the rest is the infrastructure
+  // rail. This is derived from the active transaction type, so the
+  // infrastructure swaps in/out (e.g. the Aggregator) automatically.
+  const INFRA = stations.slice(1, -1)
+  const LAST = stations.length - 1
+  const INTERNET_INDEX = stations.findIndex((s) => s.id === 'internet')
+  const phoneLabels = PHONE_LABELS[transactionType]
   const containerRef = useRef<HTMLDivElement>(null)
   const nodeRefs = useRef<(HTMLDivElement | null)[]>([])
   const [centers, setCenters] = useState<Point[]>([])
@@ -174,19 +186,13 @@ export function JourneyMap({
     (i === INTERNET_INDEX - 1 || i === INTERNET_INDEX)
 
   return (
-    <div
-      ref={containerRef}
-      className={cn(
-        'scanlines pixel-grid-bg relative overflow-hidden border-4 border-border bg-background/60 p-3 sm:p-4',
-        xray && 'bg-background/90',
-      )}
-    >
+    <div ref={containerRef} className="relative">
       {/* Pipelines / fiber-optic connectors between every slot (phones + infra) */}
       <svg
         className="pointer-events-none absolute inset-0 z-0 h-full w-full"
         aria-hidden
       >
-        {centers.length === STATIONS.length &&
+        {centers.length === stations.length &&
           centers.slice(0, -1).map((c, i) => {
             const next = centers[i + 1]
             if (!c || !next || (c.x === 0 && c.y === 0)) return null
@@ -248,7 +254,9 @@ export function JourneyMap({
           })}
       </svg>
 
-      {/* Stage: sender phone | infrastructure rail | receiver phone */}
+      {/* Stage: sender phone | infrastructure rail | receiver phone.
+          The phones live outside the pipeline window so they always have
+          room to render fully, even at small/medium text sizes. */}
       <div className="relative z-10 flex flex-col items-center gap-5 lg:flex-row lg:items-center lg:justify-center lg:gap-3">
         {/* Sender phone */}
         <div
@@ -256,58 +264,73 @@ export function JourneyMap({
           className="w-full max-w-[230px] shrink-0 lg:w-[220px]"
         >
           <p className="mb-1 text-center font-pixel text-[7px] uppercase text-arcade-cyan">
-            You (Payer)
+            {phoneLabels.sender}
           </p>
           {senderPhone}
         </div>
 
-        {/* Infrastructure rail */}
-        <div className="relative flex w-full flex-col items-center gap-1 lg:w-auto">
+        {/* Infrastructure rail \u2014 this is the "pipeline window" */}
+        <div
+          className={cn(
+            'scanlines pixel-grid-bg relative flex w-full flex-col items-center gap-1 overflow-hidden border-4 border-border bg-background/60 p-3 sm:p-4 lg:w-auto',
+            xray && 'bg-background/90',
+          )}
+        >
           <span className="hidden font-pixel text-[7px] uppercase text-muted-foreground lg:block">
             {'\u2193 Payment Rails \u2193'}
           </span>
           {/* Compact live status indicator \u2014 replaces stacked toast spam */}
-          <div className="mb-1 h-5 min-w-[220px] text-center">
+          <div className="mb-3 flex min-h-[20px] w-full items-center justify-center px-2 text-center">
             {statusLine && (
               <motion.p
                 key={statusLine}
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="inline-block border-2 border-arcade-cyan/60 bg-arcade-cyan/10 px-2 py-0.5 font-pixel text-[7px] uppercase text-arcade-cyan"
+                className="inline-block max-w-full break-words border-2 border-arcade-cyan/60 bg-arcade-cyan/10 px-2 py-0.5 font-pixel text-[7px] uppercase text-arcade-cyan"
               >
                 {statusLine}
               </motion.p>
             )}
           </div>
-          <div className="flex flex-col items-center gap-8 sm:flex-row sm:flex-nowrap sm:justify-center sm:gap-3 lg:gap-5">
-            {INFRA.map((s, idx) => {
-              const globalIdx = idx + 1
-              // Gentle S-curve on sm+: alternate a vertical offset per node
-              // so the rail breathes instead of feeling like a compressed
-              // straight line. Mobile keeps a plain vertical stack.
-              const wave =
-                idx % 2 === 0 ? 'sm:-translate-y-3.5' : 'sm:translate-y-3.5'
-              return (
-                <div
-                  key={s.id}
-                  ref={setRef(globalIdx)}
-                  className={cn(wave)}
-                >
-                  <StationNode
-                    station={s}
-                    state={stateFor(globalIdx)}
-                    provider={providerFor(s, participants)}
-                    providerOptions={optionsForSlot(s.slot)}
-                    onSelectProvider={(id) => onSelectProvider(s.slot, id)}
-                    canCustomize={canCustomize}
-                    xray={xray}
-                    onClick={() => onStationClick(s)}
-                    className="w-[100px]"
-                  />
-                </div>
-              )
-            })}
-          </div>
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.div
+              key={transactionType}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="flex flex-col items-center gap-8 sm:flex-row sm:flex-nowrap sm:justify-center sm:gap-3 lg:gap-5"
+            >
+              {INFRA.map((s, idx) => {
+                const globalIdx = idx + 1
+                // Gentle S-curve on sm+: alternate a vertical offset per node
+                // so the rail breathes instead of feeling like a compressed
+                // straight line. Mobile keeps a plain vertical stack.
+                const wave =
+                  idx % 2 === 0 ? 'sm:-translate-y-3.5' : 'sm:translate-y-3.5'
+                return (
+                  <motion.div
+                    key={s.id}
+                    layout
+                    ref={setRef(globalIdx)}
+                    className={cn(wave)}
+                  >
+                    <StationNode
+                      station={s}
+                      state={stateFor(globalIdx)}
+                      provider={providerFor(s, participants)}
+                      providerOptions={optionsForSlot(s.slot)}
+                      onSelectProvider={(id) => onSelectProvider(s.slot, id)}
+                      canCustomize={canCustomize}
+                      xray={xray}
+                      onClick={() => onStationClick(s)}
+                      className="w-[100px]"
+                    />
+                  </motion.div>
+                )
+              })}
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* Receiver phone */}
@@ -316,7 +339,7 @@ export function JourneyMap({
           className="w-full max-w-[230px] shrink-0 lg:w-[220px]"
         >
           <p className="mb-1 text-center font-pixel text-[7px] uppercase text-arcade-magenta">
-            Friend (Payee)
+            {phoneLabels.receiver}
           </p>
           {receiverPhone}
         </div>
@@ -344,6 +367,16 @@ export function JourneyMap({
             className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-background/55"
           >
             <div className="relative flex w-full max-w-xs flex-col items-center gap-2 border-4 border-destructive bg-card p-3 text-center shadow-[6px_6px_0_0_rgba(0,0,0,0.55)] crt-glow">
+              <div className="absolute left-0 top-0 h-1 w-full bg-border/60">
+                <motion.div
+                  key={attackPhase}
+                  className="h-full bg-destructive"
+                  initial={{ width: '100%' }}
+                  animate={{ width: '0%' }}
+                  transition={{ duration: attackPhaseMs / 1000, ease: 'linear' }}
+                />
+              </div>
+
               {attackPhase === 'warning' && (
                 <>
                   <span className="font-pixel text-[9px] uppercase text-destructive">
@@ -463,19 +496,19 @@ export function JourneyMap({
       </AnimatePresence>
 
       {/* X-ray detail strip */}
-      {xray && activeIndex >= 0 && STATIONS[activeIndex] && (
+      {xray && activeIndex >= 0 && stations[activeIndex] && (
         <div
           className="relative z-10 mt-4 border-2 p-2"
-          style={{ borderColor: ACCENT_VAR[STATIONS[activeIndex].color] }}
+          style={{ borderColor: ACCENT_VAR[stations[activeIndex].color] }}
         >
           <p
             className="font-pixel text-[8px] uppercase"
-            style={{ color: ACCENT_VAR[STATIONS[activeIndex].color] }}
+            style={{ color: ACCENT_VAR[stations[activeIndex].color] }}
           >
-            {STATIONS[activeIndex].xray.phase}
+            {stations[activeIndex].xray.phase}
           </p>
           <p className="mt-1 text-xs leading-relaxed text-card-foreground">
-            {STATIONS[activeIndex].xray.detail}
+            {stations[activeIndex].xray.detail}
           </p>
         </div>
       )}
