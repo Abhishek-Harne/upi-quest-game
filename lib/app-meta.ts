@@ -7,7 +7,7 @@ export const APP_META = {
   links: {
     linkedin: 'https://www.linkedin.com/in/abhishek-harne/',
     github: 'https://github.com/Abhishek-Harne',
-    website: 'https://abhishekharne.vercel.app/#ai',
+    website: 'https://abhishekharne.vercel.app/',
     source: 'https://github.com/Abhishek-Harne/upi-quest-game',
   },
 }

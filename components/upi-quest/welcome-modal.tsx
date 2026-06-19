@@ -112,7 +112,7 @@ export function WelcomeModal({
             <Code2 className="h-4 w-4" />
           </CreatorLink>
           <CreatorLink
-            href="https://abhishekharne.vercel.app/#ai"
+            href="https://abhishekharne.vercel.app/"
             label="Website"
           >
             <Globe className="h-4 w-4" />

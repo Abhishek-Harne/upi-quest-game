@@ -739,7 +739,7 @@ function PageFooter() {
         <FooterLink href="https://github.com/Abhishek-Harne" label="GitHub">
           <Code2 className="h-4 w-4" />
         </FooterLink>
-        <FooterLink href="https://abhishekharne.vercel.app/#ai" label="Website">
+        <FooterLink href="https://abhishekharne.vercel.app/" label="Website">
           <Globe className="h-4 w-4" />
         </FooterLink>
       </div>
