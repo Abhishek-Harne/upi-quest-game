@@ -121,14 +121,25 @@ export function JourneyMap({
   const INTERNET_INDEX = stations.findIndex((s) => s.id === 'internet')
   const phoneLabels = PHONE_LABELS[transactionType]
   const containerRef = useRef<HTMLDivElement>(null)
-  const nodeRefs = useRef<(HTMLDivElement | null)[]>([])
+  // Keyed by a stable slot id (not array position) so that the outgoing
+  // AnimatePresence node from a mode switch — which unmounts slightly
+  // after the incoming one mounts, since both phases briefly coexist
+  // during the exit animation — can't null out the just-attached ref for
+  // a shared id (e.g. "internet") and permanently freeze its position.
+  const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const [centers, setCenters] = useState<Point[]>([])
+
+  const SENDER_KEY = '__sender__'
+  const RECEIVER_KEY = '__receiver__'
+  const keyFor = (i: number) =>
+    i === 0 ? SENDER_KEY : i === LAST ? RECEIVER_KEY : stations[i].id
 
   const measure = useCallback(() => {
     const container = containerRef.current
     if (!container) return
     const cRect = container.getBoundingClientRect()
-    const pts: Point[] = nodeRefs.current.map((el) => {
+    const pts: Point[] = stations.map((_s, i) => {
+      const el = nodeRefs.current.get(keyFor(i))
       if (!el) return { x: 0, y: 0 }
       const r = el.getBoundingClientRect()
       return {
@@ -137,7 +148,7 @@ export function JourneyMap({
       }
     })
     setCenters(pts)
-  }, [])
+  }, [stations, LAST])
 
   useLayoutEffect(() => {
     measure()
@@ -171,7 +182,7 @@ export function JourneyMap({
     if (!running || activeIndex < 0) return
     if (typeof window === 'undefined') return
     if (!window.matchMedia('(max-width: 1024px)').matches) return
-    const el = nodeRefs.current[activeIndex]
+    const el = nodeRefs.current.get(keyFor(activeIndex))
     el?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
   }, [activeIndex, running])
 
@@ -183,7 +194,11 @@ export function JourneyMap({
   }
 
   const setRef = (i: number) => (el: HTMLDivElement | null) => {
-    nodeRefs.current[i] = el
+    // Never clear on unmount: AnimatePresence keeps the outgoing node
+    // mounted during its exit animation while the incoming one is already
+    // mounted, so an unmount cleanup firing afterwards would otherwise
+    // null out the just-attached ref for the same slot id.
+    if (el) nodeRefs.current.set(keyFor(i), el)
   }
 
   // A point is only trustworthy once its node has actually been measured;
@@ -216,7 +231,13 @@ export function JourneyMap({
         {centers.length === stations.length &&
           centers.slice(0, -1).map((c, i) => {
             const next = centers[i + 1]
-            if (!c || !next || (c.x === 0 && c.y === 0)) return null
+            if (
+              !c ||
+              !next ||
+              (c.x === 0 && c.y === 0) ||
+              (next.x === 0 && next.y === 0)
+            )
+              return null
             const reached = i < maxReached
             const isFailedLink = failedIndex === i + 1
             const isBroken = brokenLink(i)
