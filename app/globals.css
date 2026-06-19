@@ -1,0 +1,239 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: var(--font-vt323), 'VT323 Fallback', monospace;
+  --font-heading: var(--font-press-start), 'Press Start 2P Fallback', monospace;
+  --font-pixel: var(--font-press-start), 'Press Start 2P Fallback', monospace;
+  --font-mono: var(--font-vt323), monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Arcade palette tokens */
+  --color-coin: var(--coin);
+  --color-coin-glow: var(--coin-glow);
+  --color-cyan: var(--arcade-cyan);
+  --color-magenta: var(--arcade-magenta);
+  --color-grid: var(--grid);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+}
+
+:root,
+.dark {
+  color-scheme: dark;
+  /* Deep arcade night sky */
+  --background: oklch(0.16 0.06 280);
+  --foreground: oklch(0.97 0.02 95);
+
+  --card: oklch(0.22 0.07 278);
+  --card-foreground: oklch(0.97 0.02 95);
+  --popover: oklch(0.2 0.07 278);
+  --popover-foreground: oklch(0.97 0.02 95);
+
+  /* Primary = energy coin gold */
+  --primary: oklch(0.82 0.17 85);
+  --primary-foreground: oklch(0.2 0.08 280);
+
+  --secondary: oklch(0.3 0.08 278);
+  --secondary-foreground: oklch(0.97 0.02 95);
+
+  --muted: oklch(0.26 0.06 278);
+  --muted-foreground: oklch(0.74 0.05 280);
+
+  /* Accent = arcade cyan */
+  --accent: oklch(0.78 0.15 195);
+  --accent-foreground: oklch(0.18 0.07 280);
+
+  --destructive: oklch(0.62 0.24 25);
+  --destructive-foreground: oklch(0.98 0.02 95);
+
+  --border: oklch(0.45 0.1 280);
+  --input: oklch(0.3 0.08 278);
+  --ring: oklch(0.78 0.15 195);
+
+  --coin: oklch(0.85 0.18 88);
+  --coin-glow: oklch(0.9 0.19 92);
+  --arcade-cyan: oklch(0.8 0.15 195);
+  --arcade-magenta: oklch(0.7 0.24 350);
+  --grid: oklch(0.4 0.1 280 / 35%);
+
+  --chart-1: oklch(0.82 0.17 85);
+  --chart-2: oklch(0.8 0.15 195);
+  --chart-3: oklch(0.7 0.24 350);
+  --chart-4: oklch(0.75 0.2 145);
+  --chart-5: oklch(0.62 0.24 25);
+}
+
+/* Light mode kept as a slightly brighter daytime arcade for the dark toggle off */
+.light {
+  color-scheme: light;
+  --background: oklch(0.86 0.08 230);
+  --foreground: oklch(0.22 0.08 280);
+  --card: oklch(0.95 0.04 230);
+  --card-foreground: oklch(0.22 0.08 280);
+  --popover: oklch(0.95 0.04 230);
+  --popover-foreground: oklch(0.22 0.08 280);
+  --primary: oklch(0.72 0.17 70);
+  --primary-foreground: oklch(0.2 0.08 280);
+  --secondary: oklch(0.8 0.06 230);
+  --secondary-foreground: oklch(0.22 0.08 280);
+  --muted: oklch(0.82 0.05 230);
+  --muted-foreground: oklch(0.42 0.07 280);
+  --accent: oklch(0.6 0.14 195);
+  --accent-foreground: oklch(0.98 0.02 95);
+  --destructive: oklch(0.58 0.24 25);
+  --destructive-foreground: oklch(0.98 0.02 95);
+  --border: oklch(0.45 0.1 280);
+  --input: oklch(0.78 0.05 230);
+  --ring: oklch(0.6 0.14 195);
+  --coin: oklch(0.78 0.18 80);
+  --coin-glow: oklch(0.85 0.19 88);
+  --arcade-cyan: oklch(0.6 0.14 195);
+  --arcade-magenta: oklch(0.6 0.24 350);
+  --grid: oklch(0.4 0.1 280 / 22%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    image-rendering: pixelated;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@layer utilities {
+  .font-pixel {
+    font-family: var(--font-pixel);
+  }
+
+  /* Chunky pixel-art border via layered box-shadow (no anti-aliasing) */
+  .pixel-box {
+    box-shadow:
+      0 0 0 4px var(--background),
+      0 0 0 8px var(--border);
+  }
+  .pixel-box-primary {
+    box-shadow:
+      0 0 0 4px var(--background),
+      0 0 0 8px var(--primary);
+  }
+  .pixel-box-accent {
+    box-shadow:
+      0 0 0 4px var(--background),
+      0 0 0 8px var(--accent);
+  }
+
+  .crt-glow {
+    text-shadow:
+      0 0 6px color-mix(in oklch, currentColor 70%, transparent),
+      0 0 12px color-mix(in oklch, currentColor 40%, transparent);
+  }
+
+  .coin-shadow {
+    box-shadow:
+      0 0 12px 2px var(--coin-glow),
+      0 0 28px 6px color-mix(in oklch, var(--coin-glow) 60%, transparent);
+  }
+
+  /* CRT scanline overlay */
+  .scanlines::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      color-mix(in oklch, black 16%, transparent) 0px,
+      color-mix(in oklch, black 16%, transparent) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    z-index: 50;
+    mix-blend-mode: multiply;
+  }
+
+  .pixel-grid-bg {
+    background-image:
+      linear-gradient(to right, var(--grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+}
+
+@keyframes float-cloud {
+  from {
+    transform: translateX(-20vw);
+  }
+  to {
+    transform: translateX(120vw);
+  }
+}
+
+@keyframes pixel-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes coin-spin {
+  0% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(0.25);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes blink {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  61%,
+  100% {
+    opacity: 0.2;
+  }
+}
