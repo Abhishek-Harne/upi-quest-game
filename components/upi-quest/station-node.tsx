@@ -208,6 +208,8 @@ export function StationNode({
         <InfoTooltip
           term={station.tooltip.term}
           definition={station.tooltip.definition}
+          fullForm={station.tooltip.fullForm}
+          analogy={station.tooltip.analogy}
           accent={accent}
         >
           <span

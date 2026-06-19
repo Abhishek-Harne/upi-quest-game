@@ -41,7 +41,12 @@ export interface Station {
   /** Calm, guided narration used in demo / creator mode */
   narration: string
   /** Tooltip definition shown on hover (desktop) or tap (mobile) */
-  tooltip: { term: string; definition: string }
+  tooltip: {
+    term: string
+    definition: string
+    fullForm?: string
+    analogy?: string
+  }
   /** Technical step name surfaced in X-Ray mode */
   xray: { phase: string; detail: string }
   color: AccentColor
@@ -64,6 +69,8 @@ export const STATIONS: Station[] = [
       term: 'Sender Phone',
       definition:
         'Your device, where you enter the amount and authorise the payment with your UPI PIN.',
+      analogy:
+        'Think of it as the counter where you fill out a deposit slip before handing it over.',
     },
     xray: {
       phase: 'Request Creation',
@@ -85,9 +92,12 @@ export const STATIONS: Station[] = [
       "I'm your UPI app. I build a secure request with your VPA (you@bank) and your encrypted UPI PIN, then hand it onward.",
     narration: 'The UPI app packages your payment information securely.',
     tooltip: {
-      term: 'PSP App',
+      term: 'UPI',
+      fullForm: 'Unified Payments Interface',
       definition:
-        'A Payment Service Provider app (PhonePe, GPay, Paytm, BHIM) that lets you create a VPA and pay from your bank.',
+        'A Payment Service Provider app (PhonePe, GPay, Paytm, BHIM) that lets you create a VPA and pay from your bank, all powered by UPI.',
+      analogy:
+        'Think of UPI as a universal language that lets every bank communicate with one another.',
     },
     xray: {
       phase: 'Authentication',
@@ -110,8 +120,11 @@ export const STATIONS: Station[] = [
     narration: 'Aggregators help businesses accept and manage payments.',
     tooltip: {
       term: 'Aggregator',
+      fullForm: 'Payment Aggregator',
       definition:
-        'A licensed entity (Razorpay, BharatPe, Cashfree) that helps businesses collect and process payments.',
+        'A licensed entity (Razorpay, BharatPe, Cashfree) that helps businesses accept digital payments without building their own payment infrastructure.',
+      analogy:
+        'Think of an aggregator as a delivery partner that collects parcels from customers and routes them through the logistics network.',
     },
     xray: {
       phase: 'Validation',
@@ -134,8 +147,11 @@ export const STATIONS: Station[] = [
     narration: 'The bank verifies account ownership and your balance.',
     tooltip: {
       term: 'PSP Bank',
+      fullForm: 'Payment Service Provider Bank',
       definition:
-        'A bank that participates directly in UPI routing and sponsors apps onto the network.',
+        'A bank that participates directly in UPI routing and connects banks and UPI apps onto the network.',
+      analogy:
+        'Think of a PSP Bank as a railway station connecting passengers to the larger railway network.',
     },
     xray: {
       phase: 'Debit Authorisation',
@@ -158,9 +174,12 @@ export const STATIONS: Station[] = [
     narration:
       'The request travels across the internet inside an encrypted, tamper-proof tunnel.',
     tooltip: {
-      term: 'Secure Tunnel',
+      term: 'Internet',
+      fullForm: 'Secure Encrypted Tunnel',
       definition:
         'UPI traffic moves over the internet inside encrypted TLS tunnels between licensed parties, so data stays private end-to-end.',
+      analogy:
+        'Think of it as an armoured courier van — the road is public, but nobody can see or touch what is inside.',
     },
     xray: {
       phase: 'Encrypted Transport',
@@ -183,8 +202,11 @@ export const STATIONS: Station[] = [
     narration: 'NPCI acts as the central routing layer for every UPI transaction.',
     tooltip: {
       term: 'NPCI',
+      fullForm: 'National Payments Corporation of India',
       definition:
-        'National Payments Corporation of India. It operates the UPI payment rails and routes transactions between banks.',
+        'It operates the UPI payment rails and routes and coordinates transactions between every bank.',
+      analogy:
+        'Think of NPCI as an air traffic control tower directing thousands of flights safely to their destinations.',
     },
     xray: {
       phase: 'Routing',
@@ -208,7 +230,9 @@ export const STATIONS: Station[] = [
     tooltip: {
       term: 'Receiver Bank',
       definition:
-        'The beneficiary\u2019s bank that credits the incoming amount to the destination account.',
+        'The beneficiary\u2019s bank, which confirms the destination account and credits funds to the recipient.',
+      analogy:
+        'Think of it as the final post office delivering a parcel to the recipient\u2019s home.',
     },
     xray: {
       phase: 'Settlement',

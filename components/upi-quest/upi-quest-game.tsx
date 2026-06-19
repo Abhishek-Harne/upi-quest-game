@@ -8,9 +8,11 @@ import {
   ChevronDown,
   Eye,
   EyeOff,
+  Moon,
   PlayCircle,
   ShieldAlert,
   Sparkles,
+  Sun,
 } from 'lucide-react'
 import {
   MODES,
@@ -69,6 +71,10 @@ function GameInner() {
   const [received, setReceived] = useState(false)
 
   const [attackPhase, setAttackPhase] = useState<AttackPhase>('none')
+  const [attackScenario, setAttackScenario] = useState<
+    (typeof SECURITY_SCENARIOS)[number] | null
+  >(null)
+  const [statusLine, setStatusLine] = useState<string | null>(null)
 
   const [dialogueStation, setDialogueStation] = useState<Station | null>(null)
   const [result, setResult] = useState<ResultData | null>(null)
@@ -191,49 +197,51 @@ function GameInner() {
     [amount, celebrate, mode, play, store, toast],
   )
 
+  // Arcade-style cyber heist: an ~20s beat-by-beat sequence that fully halts
+  // the transaction (no station-advance timers run during this window) so
+  // the interruption feels meaningful rather than cosmetic. `onResume` is
+  // called once the network is restored, letting the journey continue from
+  // exactly where it paused.
   const triggerAttack = useCallback(
-    (baseDelay: number) => {
+    (onResume: () => void) => {
       const scenario =
         SECURITY_SCENARIOS[scenarioIdx.current % SECURITY_SCENARIOS.length]
       scenarioIdx.current += 1
+      setAttackScenario(scenario)
 
-      // 1. A thief jumps onto the rails and grabs the money packet
+      const beats: Array<{ phase: AttackPhase; ms: number; onStart?: () => void }> = [
+        { phase: 'warning', ms: 1500, onStart: () => play('alarm') },
+        { phase: 'thief', ms: 2800, onStart: () => play('error') },
+        { phase: 'narration', ms: 5200 },
+        { phase: 'siren', ms: 1500, onStart: () => play('siren') },
+        { phase: 'guardian', ms: 3200, onStart: () => play('success') },
+        { phase: 'recovery', ms: 3800, onStart: () => play('coin') },
+      ]
+
+      let elapsed = 0
+      beats.forEach((beat) => {
+        timers.current.push(
+          setTimeout(() => {
+            setAttackPhase(beat.phase)
+            beat.onStart?.()
+          }, elapsed),
+        )
+        elapsed += beat.ms
+      })
+
       timers.current.push(
         setTimeout(() => {
-          setAttackPhase('thief')
-          play('error')
-          toast({
-            tone: 'error',
-            title: `Heist Attempt: ${scenario.attack}`,
-            detail: scenario.attackDesc,
-          })
-        }, baseDelay),
-      )
-      // 2. The Cyber Police arrives and busts the thief
-      timers.current.push(
-        setTimeout(() => {
-          setAttackPhase('police')
-          play('success')
+          setAttackPhase('none')
+          setAttackScenario(null)
           store.recordCyberWin()
           store.addXp(XP.cyberChallenge)
           toast({
             tone: 'cyber',
-            title: `Cyber Police Saved It! +${XP.cyberChallenge} XP`,
-            detail: scenario.defenseDesc,
-          })
-        }, baseDelay + 900),
-      )
-      // 3. The money is recovered and the lesson is delivered
-      timers.current.push(
-        setTimeout(() => {
-          setAttackPhase('none')
-          play('coin')
-          toast({
-            tone: 'fact',
-            title: `Money Recovered! ${scenario.defense}`,
+            title: `Threat Neutralized: ${scenario.defense}`,
             detail: scenario.lesson,
           })
-        }, baseDelay + 2100),
+          onResume()
+        }, elapsed),
       )
     },
     [play, store, toast],
@@ -241,77 +249,70 @@ function GameInner() {
 
   const runJourney = useCallback(
     (heist = false) => {
-    if (running || overLimit) return
-    clearTimers()
-    const selectedMode = MODES.find((m) => m.id === mode)!
-    const failIdx = selectedMode.failAt
-      ? STATIONS.findIndex((s) => s.id === selectedMode.failAt)
-      : -1
+      if (running || overLimit) return
+      clearTimers()
+      const selectedMode = MODES.find((m) => m.id === mode)!
+      const failIdx = selectedMode.failAt
+        ? STATIONS.findIndex((s) => s.id === selectedMode.failAt)
+        : -1
 
-    setResult(null)
-    setReceived(false)
-    setFailedIndex(null)
-    setAttackPhase('none')
-    setActiveIndex(0)
-    setMaxReached(0)
-    setRunning(true)
-    startedAt.current = Date.now()
-    play('send')
+      setResult(null)
+      setReceived(false)
+      setFailedIndex(null)
+      setAttackPhase('none')
+      setStatusLine(STATIONS[0].statusMessage)
+      setActiveIndex(0)
+      setMaxReached(0)
+      setRunning(true)
+      startedAt.current = Date.now()
+      play('send')
 
-    const stepMs = STEP_BASE_MS / selectedMode.speed
-    const lastStep = failIdx >= 0 ? failIdx : STATIONS.length - 1
+      const stepMs = STEP_BASE_MS / selectedMode.speed
+      const lastStep = failIdx >= 0 ? failIdx : STATIONS.length - 1
+      const reachesInternet = failIdx < 0 || failIdx > INTERNET_INDEX
+      const heistAtInternet = heist && reachesInternet
 
-    for (let i = 1; i <= lastStep; i++) {
-      const t = setTimeout(() => {
-        setActiveIndex(i)
-        setMaxReached((m) => Math.max(m, i))
-        const st = STATIONS[i]
-        if (failIdx >= 0 && i === failIdx) {
-          setFailedIndex(i)
-          play('error')
-          toast({
-            tone: 'error',
-            title: st.label,
-            detail: selectedMode.failMessage,
-          })
-        } else {
-          play('step')
-          toast({ tone: 'cyber', title: st.label, detail: st.statusMessage })
+      // Step the packet one station at a time. Each step schedules the next
+      // one itself, so a cyber heist can fully pause the chain (instead of
+      // racing against pre-scheduled timers) and resume it exactly where it
+      // left off.
+      const step = (i: number) => {
+        if (i > lastStep) {
+          if (failIdx >= 0) {
+            finish(false, failIdx, selectedMode.failMessage)
+          } else {
+            setActiveIndex(STATIONS.length - 1)
+            setStatusLine(STATIONS[STATIONS.length - 1].statusMessage)
+            finish(true, null)
+          }
+          return
         }
-      }, stepMs * i)
-      timers.current.push(t)
-    }
 
-    // Cyber heist event at the Internet node on healthy journeys
-    const reachesInternet = failIdx < 0 || failIdx > INTERNET_INDEX
-    if (heist && reachesInternet) {
-      triggerAttack(stepMs * INTERNET_INDEX + stepMs * 0.4)
-    }
+        const t = setTimeout(() => {
+          setActiveIndex(i)
+          setMaxReached((m) => Math.max(m, i))
+          const st = STATIONS[i]
+          if (failIdx >= 0 && i === failIdx) {
+            setFailedIndex(i)
+            play('error')
+            setStatusLine(selectedMode.failMessage ?? st.statusMessage)
+          } else {
+            play('step')
+            setStatusLine(st.statusMessage)
+          }
 
-    const endT = setTimeout(
-      () => {
-        if (failIdx >= 0) {
-          finish(false, failIdx, selectedMode.failMessage)
-        } else {
-          setActiveIndex(STATIONS.length - 1)
-          finish(true, null)
-        }
-      },
-      // Give the heist sequence time to resolve before completing
-      stepMs * (lastStep + 1) + (heist && reachesInternet ? 1400 : 0),
-    )
-    timers.current.push(endT)
+          if (heistAtInternet && i === INTERNET_INDEX) {
+            triggerAttack(() => step(i + 1))
+          } else {
+            step(i + 1)
+          }
+        }, i === 0 ? 0 : stepMs)
+        timers.current.push(t)
+      }
+
+      step(1)
     },
-    [
-      clearTimers,
-      finish,
-      mode,
-      overLimit,
-      play,
-      running,
-      toast,
-      triggerAttack,
-    ],
+    [clearTimers, finish, mode, overLimit, play, running, triggerAttack],
   )
 
   const reset = useCallback(() => {
@@ -323,6 +324,7 @@ function GameInner() {
     setReceived(false)
     setResult(null)
     setAttackPhase('none')
+    setStatusLine(null)
   }, [clearTimers])
 
   const onStationClick = useCallback(
@@ -360,6 +362,23 @@ function GameInner() {
     <div className="relative min-h-dvh overflow-hidden text-foreground">
       <ArcadeBackground />
 
+      {/* Always-visible quick theme toggle, independent of the burger menu */}
+      <button
+        onClick={() =>
+          store.setSettings({
+            theme: store.settings.theme === 'dark' ? 'light' : 'dark',
+          })
+        }
+        aria-label="Toggle theme"
+        className="fixed bottom-4 right-4 z-[70] flex h-11 w-11 items-center justify-center border-2 border-coin bg-card text-coin shadow-[3px_3px_0_0_rgba(0,0,0,0.5)] transition-all hover:brightness-110 active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_0_rgba(0,0,0,0.5)]"
+      >
+        {store.settings.theme === 'dark' ? (
+          <Sun className="h-5 w-5" />
+        ) : (
+          <Moon className="h-5 w-5" />
+        )}
+      </button>
+
       <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-3 px-3 py-3 sm:px-5 sm:py-4">
         {/* Compact title */}
         <div className="text-center">
@@ -384,6 +403,8 @@ function GameInner() {
           canCustomize={!running}
           participants={store.participants}
           attackPhase={attackPhase}
+          attackScenario={attackScenario}
+          statusLine={statusLine}
           onStationClick={onStationClick}
           onSelectProvider={onSelectProvider}
           senderPhone={

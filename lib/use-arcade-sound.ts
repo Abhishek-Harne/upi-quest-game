@@ -10,6 +10,8 @@ export type SoundName =
   | 'error'
   | 'coin'
   | 'levelup'
+  | 'siren'
+  | 'alarm'
 
 // Simple Web Audio synth for retro arcade beeps. No assets needed.
 export function useArcadeSound(enabled: boolean) {
@@ -93,6 +95,17 @@ export function useArcadeSound(enabled: boolean) {
         case 'error':
           tone(200, 0.18, 'sawtooth', 0, 0.06)
           tone(140, 0.28, 'sawtooth', 0.12, 0.06)
+          break
+        case 'alarm':
+          tone(880, 0.12, 'square', 0, 0.07)
+          tone(440, 0.12, 'square', 0.14, 0.07)
+          tone(880, 0.12, 'square', 0.28, 0.07)
+          break
+        case 'siren':
+          tone(660, 0.3, 'sine', 0, 0.06)
+          tone(990, 0.3, 'sine', 0.3, 0.06)
+          tone(660, 0.3, 'sine', 0.6, 0.06)
+          tone(990, 0.3, 'sine', 0.9, 0.06)
           break
       }
     },

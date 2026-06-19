@@ -15,7 +15,7 @@ import {
   type ModeId,
   type Participants,
 } from './upi-data'
-import { FUN_FACTS } from './upi-facts'
+import { DIFFICULTY_ORDER, FUN_FACTS } from './upi-facts'
 
 export type TextSize = 'sm' | 'md' | 'lg' | 'xl'
 export type ThemeMode = 'dark' | 'light'
@@ -180,16 +180,23 @@ export function GameStoreProvider({ children }: { children: React.ReactNode }) {
     setStats((s) => ({ ...s, cyberWins: s.cyberWins + 1 }))
   }, [])
 
+  // Facts unlock progressively: every Beginner fact before any Intermediate
+  // fact unlocks, every Intermediate before any Advanced, and so on.
   const unlockRandomFact = useCallback((): string | null => {
     let unlockedId: string | null = null
     setStats((s) => {
-      const remaining = FUN_FACTS.filter(
-        (f) => !s.factsUnlocked.includes(f.id),
-      )
-      if (remaining.length === 0) return s
-      const pick = remaining[Math.floor(Math.random() * remaining.length)]
-      unlockedId = pick.id
-      return { ...s, factsUnlocked: [...s.factsUnlocked, pick.id] }
+      const unlockedSet = new Set(s.factsUnlocked)
+      for (const tier of DIFFICULTY_ORDER) {
+        const remainingInTier = FUN_FACTS.filter(
+          (f) => f.difficulty === tier && !unlockedSet.has(f.id),
+        )
+        if (remainingInTier.length === 0) continue
+        const pick =
+          remainingInTier[Math.floor(Math.random() * remainingInTier.length)]
+        unlockedId = pick.id
+        return { ...s, factsUnlocked: [...s.factsUnlocked, pick.id] }
+      }
+      return s
     })
     return unlockedId
   }, [])
