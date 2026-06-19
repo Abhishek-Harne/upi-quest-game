@@ -5,9 +5,13 @@ import confetti from 'canvas-confetti'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   BookOpen,
+  Briefcase,
   ChevronDown,
+  Code2,
   Eye,
   EyeOff,
+  Globe,
+  Heart,
   Moon,
   PlayCircle,
   ShieldAlert,
@@ -236,7 +240,7 @@ function GameInner() {
 
       const beats: Array<{ phase: AttackPhase; ms: number; onStart?: () => void }> = [
         { phase: 'warning', ms: 2200, onStart: () => play('alarm') },
-        { phase: 'thief', ms: 4000, onStart: () => play('error') },
+        { phase: 'thief', ms: 6500, onStart: () => play('error') },
         { phase: 'narration', ms: 7000 },
         { phase: 'siren', ms: 2200, onStart: () => play('siren') },
         { phase: 'guardian', ms: 4400, onStart: () => play('success') },
@@ -611,6 +615,8 @@ function GameInner() {
           to swap your UPI app, aggregator or banks. Hit &quot;Let&apos;s Steal
           Some Money&quot; to watch the Cyber Police defend your cash in transit.
         </p>
+
+        <PageFooter />
       </main>
 
       {/* Overlays */}
@@ -713,5 +719,53 @@ function ToggleChip({
       {icon}
       {children}
     </button>
+  )
+}
+
+function PageFooter() {
+  return (
+    <footer className="mt-2 border-t-2 border-border pt-4 text-center">
+      <p className="flex items-center justify-center gap-1.5 text-sm text-card-foreground">
+        Built with <Heart className="h-4 w-4 text-[var(--arcade-magenta)]" />{' '}
+        and curiosity
+      </p>
+      <p className="mt-1 font-pixel text-[10px] uppercase text-[var(--coin)]">
+        Abhishek Harne
+      </p>
+      <div className="mt-3 flex items-center justify-center gap-2">
+        <FooterLink href="https://www.linkedin.com/in/abhishek-harne/" label="LinkedIn">
+          <Briefcase className="h-4 w-4" />
+        </FooterLink>
+        <FooterLink href="https://github.com/Abhishek-Harne" label="GitHub">
+          <Code2 className="h-4 w-4" />
+        </FooterLink>
+        <FooterLink href="https://abhishekharne.vercel.app/" label="Website">
+          <Globe className="h-4 w-4" />
+        </FooterLink>
+      </div>
+    </footer>
+  )
+}
+
+function FooterLink({
+  href,
+  label,
+  children,
+}: {
+  href: string
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={label}
+      className="flex items-center gap-1.5 border-2 border-border bg-secondary px-2.5 py-1.5 text-xs text-secondary-foreground transition-colors hover:border-[var(--coin)] hover:text-[var(--coin)]"
+    >
+      {children}
+      <span>{label}</span>
+    </a>
   )
 }
